@@ -15,6 +15,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -24,6 +25,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +33,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/goharbor/harbor/src/lib/log"
 )
 
 type stubNetworkResolver struct {
@@ -50,7 +54,7 @@ func (resolver *stubNetworkResolver) LookupNetIP(_ context.Context, _ string, ho
 func setEgressEnv(t *testing.T, policy, legacy, allowlist string) {
 	t.Helper()
 	t.Setenv(webhookEgressPolicyEnv, policy)
-	t.Setenv(privateNetworkAccessEnv, legacy)
+	t.Setenv(removedPrivateNetworkAccessEnv, legacy)
 	t.Setenv(webhookEgressAllowlistEnv, allowlist)
 }
 
@@ -192,8 +196,8 @@ func TestValidateNetworkTargetBlockRestricted(t *testing.T) {
 	}
 }
 
-// TestEgressLevelPrecedence pins the compatibility contract: the policy wins, the deprecated boolean
-// keeps its 2.15 meaning when the policy is unset, and invalid values fail closed.
+// TestEgressLevelPrecedence pins the contract: the policy wins, the removed boolean never selects
+// allow_all, and a leftover boolean or an invalid policy fails closed to public_only.
 func TestEgressLevelPrecedence(t *testing.T) {
 	for _, tc := range []struct {
 		policy, legacy string
@@ -201,8 +205,8 @@ func TestEgressLevelPrecedence(t *testing.T) {
 	}{
 		{"", "", egressAllowAll},
 		{" ", " ", egressAllowAll},
-		{"", "true", egressAllowAll},
-		{"", "1", egressAllowAll},
+		{"", "true", egressPublicOnly},
+		{"", "1", egressPublicOnly},
 		{"", "false", egressPublicOnly},
 		{"", "flase", egressPublicOnly},
 		{"allow_all", "", egressAllowAll},
@@ -210,11 +214,28 @@ func TestEgressLevelPrecedence(t *testing.T) {
 		{"public_only", "", egressPublicOnly},
 		{"public_only", "true", egressPublicOnly},
 		{"allow_all", "false", egressAllowAll},
+		{"block_restricted", "true", egressBlockRestricted},
 		{"allow-all", "true", egressPublicOnly},
 	} {
 		t.Run(tc.policy+"/"+tc.legacy, func(t *testing.T) {
 			assert.Equal(t, tc.want, parseEgressLevel(tc.policy, tc.legacy))
 		})
+	}
+}
+
+// TestRemovedPrivateNetworkAccessLogsError asserts operators are told which variable to set when a
+// leftover boolean pins public_only.
+func TestRemovedPrivateNetworkAccessLogsError(t *testing.T) {
+	var out bytes.Buffer
+	log.DefaultLogger().SetOutput(&out)
+	t.Cleanup(func() { log.DefaultLogger().SetOutput(os.Stdout) })
+
+	for _, legacy := range []string{"true", "false"} {
+		out.Reset()
+		assert.Equal(t, egressPublicOnly, parseEgressLevel("", legacy))
+		assert.Contains(t, out.String(), "[ERROR]")
+		assert.Contains(t, out.String(), removedPrivateNetworkAccessEnv)
+		assert.Contains(t, out.String(), webhookEgressPolicyEnv)
 	}
 }
 
@@ -225,7 +246,7 @@ func TestValidateNetworkTargetPerLevel(t *testing.T) {
 		public, private, restricted bool
 	}{
 		{"allow_all", "", true, true, true},
-		{"", "true", true, true, true},
+		{"", "true", true, false, false},
 		{"block_restricted", "", true, true, false},
 		{"", "", true, true, true},
 		{"public_only", "", true, false, false},

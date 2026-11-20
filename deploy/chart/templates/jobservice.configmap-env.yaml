@@ -33,7 +33,6 @@ data:
   NO_PROXY: "{{ template "harbor.noProxy" . }}"
   {{- end }}
   {{- include "harbor.webhookEgressEnv" . | nindent 2 }}
-  HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: {{ .Values.network.allowPrivateNetworkAccess | quote }}
   {{- if .Values.metrics.enabled}}
   METRIC_NAMESPACE: harbor
   METRIC_SUBSYSTEM: jobservice
