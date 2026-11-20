@@ -49,7 +49,7 @@ jobs:
           client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
           owner: container-registry
-          repositories: harbor-next
+          repositories: 8gcr
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write # dependencyDashboard
@@ -65,5 +65,5 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           renovate-version: ${{ steps.versions.outputs.renovate }}
         env:
-          RENOVATE_REPOSITORIES: container-registry/harbor-next
+          RENOVATE_REPOSITORIES: container-registry/8gcr
           LOG_LEVEL: info

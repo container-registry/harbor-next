@@ -23,7 +23,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     # Keep CodeQL available to fork pushes and PRs; reserve its scheduled scan for the canonical repo.
-    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
+    if: github.event_name != 'schedule' || github.repository == 'container-registry/8gcr'
     runs-on: ubuntu-26.04
     permissions:
       actions: read

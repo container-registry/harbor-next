@@ -1,12 +1,12 @@
-# Harbor Next
+# 8gcr
 
-<p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
+<p align="center"><img alt="8gcr" width="256px" src="https://raw.githubusercontent.com/container-registry/8gcr/refs/heads/main/docs/img/8gcr-logo.svg"></p>
 
 <!-- The stable badge filters on v2.15.*; change the filter when the maintained line moves. -->
-[![Nightly](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml/badge.svg)](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml)
-[![stable](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=v2.15.*&label=stable)](https://github.com/container-registry/harbor-next/releases?q=v2.15)
-[![beta](https://img.shields.io/github/v/release/container-registry/harbor-next?include_prereleases&filter=*-beta&label=beta&color=orange)](https://github.com/container-registry/harbor-next/releases?q=prerelease%3Atrue)
-[![helm](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=chart-v*&label=helm&logo=helm&logoColor=white)](https://github.com/container-registry/harbor-next/releases?q=chart)
+[![Nightly](https://github.com/container-registry/8gcr/actions/workflows/nightly.yml/badge.svg)](https://github.com/container-registry/8gcr/actions/workflows/nightly.yml)
+[![stable](https://img.shields.io/github/v/release/container-registry/8gcr?filter=v2.15.*&label=stable)](https://github.com/container-registry/8gcr/releases?q=v2.15)
+[![beta](https://img.shields.io/github/v/release/container-registry/8gcr?include_prereleases&filter=*-beta&label=beta&color=orange)](https://github.com/container-registry/8gcr/releases?q=prerelease%3Atrue)
+[![helm](https://img.shields.io/github/v/release/container-registry/8gcr?filter=chart-v*&label=helm&logo=helm&logoColor=white)](https://github.com/container-registry/8gcr/releases?q=chart)
 
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
 
@@ -15,19 +15,19 @@ Harbor is hosted by the [Cloud Native Computing Foundation](https://cncf.io)
 If you are an organization that wants to help shape the evolution of Harbor,
 [reach out](https://container-registry.com/contact/) to us.
 
-## What is Harbor Next
+## What is 8gcr
 
-Harbor Next is a community-driven evolution of Harbor, designed to accelerate innovation and lower the barrier to entry for contributors.
-It serves as the foundation for [8gcr](https://container-registry.com/8gcr) (8gears Container Registry), used across enterprises, government agencies, and cloud providers.
+This project, 8gcr, is a community-driven evolution of Harbor, designed to accelerate innovation and lower the barrier to entry for contributors.
+It is the open source foundation of the [8gcr](https://container-registry.com/8gcr) (8gears Container Registry) commercial distribution, used across enterprises, government agencies, and cloud providers.
 
-We're developing Harbor Next as a [community proposal](https://github.com/goharbor/community/pull/272) with the goal of advancing Harbor and the container registry ecosystem.
+We're developing 8gcr as a [community proposal](https://github.com/goharbor/community/pull/272) with the goal of advancing Harbor and the container registry ecosystem.
 
-- Harbor Next and CNCF Harbor cross-pollinate: Harbor Next cherry-picks features and fixes from Harbor, and upstream Harbor adopts features and concepts proven in Harbor Next.
-- Harbor Next follows Harbor's release cadence. The `main` branch always targets the next development release in `VERSION`; published release state is tracked by release-please.
-- Harbor Next is a drop-in replacement for Harbor.
+- 8gcr and CNCF Harbor cross-pollinate: 8gcr cherry-picks features and fixes from Harbor, and upstream Harbor adopts features and concepts proven in 8gcr.
+- 8gcr follows Harbor's release cadence. The `main` branch always targets the next development release in `VERSION`; published release state is tracked by release-please.
+- 8gcr is a drop-in replacement for Harbor.
 
 
-## Notable Changes in Harbor Next
+## Notable Changes in 8gcr
 - Contributor/Maintainer ladder automation
 - Continuous delivery
 - Easy Contributor onboarding with out of the box dev environments
@@ -39,7 +39,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 - Versatile Helm Chart
 - Open Compose (install.sh less) supporting Docker & Podman Compose
 - Support for OpenShift, Rancher, k3s, Nutanix (NKP)
-- Prepending vetted features not yet upstream — see the [release notes](https://github.com/container-registry/harbor-next/releases)
+- Prepending vetted features not yet upstream — see the [release notes](https://github.com/container-registry/8gcr/releases)
 - See [ROADMAP.md](/ROADMAP.md) for more...
 
 ## Harbor Features
@@ -55,16 +55,16 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 * **Graphical user portal**: Browse, search repositories, and manage projects from the web UI.
 * **Auditing**: All repository operations are tracked through logs.
 * **RESTful API**: REST APIs for administrative operations and integration, with an embedded Swagger UI for exploring and testing.
-* **Easy deployment**: Deploy via Docker/Podman Compose or the Harbor Next Helm chart.
+* **Easy deployment**: Deploy via Docker/Podman Compose or the 8gcr Helm chart.
 
 
 ## Architecture
 
-For the architecture design of Harbor Next, see [Architecture Overview](docs/architecture-overview.md).
+For the architecture design of 8gcr, see [Architecture Overview](docs/architecture-overview.md).
 
 ## API
 
-Harbor Next exposes a RESTful API for administrative operations and integration. Explore it in the [Swagger editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/harbor-next/main/api/v2.0/swagger.yaml) or from the source spec [`api/v2.0/swagger.yaml`](api/v2.0/swagger.yaml).
+8gcr exposes a RESTful API for administrative operations and integration. Explore it in the [Swagger editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/8gcr/main/api/v2.0/swagger.yaml) or from the source spec [`api/v2.0/swagger.yaml`](api/v2.0/swagger.yaml).
 
 ## Install & Run
 
@@ -79,7 +79,7 @@ Harbor Next exposes a RESTful API for administrative operations and integration.
 | Source | `main` | nothing published | Development only, see [Development](#development). |
 
 Both channels are published to `8gears.container-registry.com/8gcr/`, and every tag has its
-notes on the [releases page](https://github.com/container-registry/harbor-next/releases).
+notes on the [releases page](https://github.com/container-registry/8gcr/releases).
 
 The beta tag rolls: the nightly build moves it onto that night's commit, so the same tag
 pulled a week apart is a different image. Pin a stable tag for anything you have to keep
@@ -93,7 +93,7 @@ cp .env.example .env          # set HARBOR_TAG, EXT_ENDPOINT, TLS_CERT/TLS_KEY, 
 docker compose up -d
 ```
 
-**Kubernetes** — install the Harbor Next Helm chart (`deploy/chart/`, also published as an OCI artifact; under active development). Platform guides live in [deploy/chart/docs/guide/](deploy/chart/docs/guide/) (k3s, OpenShift, Rancher, Nutanix).
+**Kubernetes** — install the 8gcr Helm chart (`deploy/chart/`, also published as an OCI artifact; under active development). Platform guides live in [deploy/chart/docs/guide/](deploy/chart/docs/guide/) (k3s, OpenShift, Rancher, Nutanix).
 
 The chart carries its own version, released under `chart-v*` tags and shown in the helm
 badge above. It does not track the Harbor version, so read its `appVersion` to see which
@@ -101,7 +101,7 @@ Harbor release a given chart deploys.
 
 ## Development
 
-Harbor Next uses [Taskfile](https://taskfile.dev) for local development and in pipelines for a fast, hybrid development environment with hot reload capabilities.
+8gcr uses [Taskfile](https://taskfile.dev) for local development and in pipelines for a fast, hybrid development environment with hot reload capabilities.
 
 ### Prerequisites
 
@@ -168,7 +168,7 @@ The [compatibility list](https://goharbor.io/docs/edge/install-config/harbor-com
 
 ## Demos
 
-* **[Live Demo](https://8gcr.container-registry.dev)** - A demo environment with the latest Harbor-Next build.
+* **[Live Demo](https://8gcr.container-registry.dev)** - A demo environment with the latest 8gcr build.
 * **[Harbor Demo Videos](https://github.com/goharbor/harbor/wiki/Video-demos-for-Harbor)** - Demos for Harbor features and continuously updated.
 
 ## Partners and Users

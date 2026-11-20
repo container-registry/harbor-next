@@ -1,4 +1,4 @@
-# Harbor Next
+# 8gcr
 
 Enhanced fork of [goharbor/harbor](https://github.com/goharbor/harbor). Go backend in `src/`, Angular frontend in `src/portal/`, build automation via Taskfile.
 

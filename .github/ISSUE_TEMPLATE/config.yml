@@ -2,8 +2,8 @@ blank_issues_enabled: false
 
 contact_links:
   - name: GitHub Discussions
-    url: https://github.com/container-registry/harbor-next/discussions
+    url: https://github.com/container-registry/8gcr/discussions
     about: Ask questions and discuss with the community
   - name: Security Vulnerability
-    url: https://github.com/container-registry/harbor-next/security/advisories/new
+    url: https://github.com/container-registry/8gcr/security/advisories/new
     about: Report Security Vulnerabilities privately

@@ -1,10 +1,10 @@
 # Security Response Process (Maintainer Runbook)
 
-This document describes how Harbor Next maintainers handle private vulnerability reports, from intake to public disclosure. The reporter-facing policy is [SECURITY.md](../SECURITY.md).
+This document describes how 8gcr maintainers handle private vulnerability reports, from intake to public disclosure. The reporter-facing policy is [SECURITY.md](../SECURITY.md).
 
 The whole process happens inside **one GitHub artifact**: the private report becomes the draft security advisory, the fix is developed in the advisory's temporary private fork, the CVE is requested inside the advisory, and publishing the advisory is the disclosure. Nothing is re-transcribed between systems.
 
-This process follows the workflow proposed for upstream Harbor in [goharbor/community#292](https://github.com/goharbor/community/pull/292). Harbor Next acts as the reference implementation.
+This process follows the workflow proposed for upstream Harbor in [goharbor/community#292](https://github.com/goharbor/community/pull/292). 8gcr acts as the reference implementation.
 
 ## Roles
 
@@ -15,7 +15,7 @@ Every incoming report needs exactly one advisory lead. If you accept a report, y
 
 ## 1. Receiving a report
 
-Reports arrive at **Security → Advisories** as `Proposed` advisories: <https://github.com/container-registry/harbor-next/security/advisories?state=triage>
+Reports arrive at **Security → Advisories** as `Proposed` advisories: <https://github.com/container-registry/8gcr/security/advisories?state=triage>
 
 Notifications for new private reports go to repo admins and org security managers only. **Check the queue at least weekly** even if you saw no notification.
 
@@ -27,8 +27,8 @@ Within **3 business days** of a report arriving:
 2. Do a first sanity check:
    - **Spam or clearly invalid** → close the report with a short explanation. Anyone with a GitHub account can file, so expect noise; closing politely and quickly is part of the job.
    - **Already public** (existing CVE, public scanner finding, already-disclosed dependency issue) → ask the reporter to re-file as a public issue and close the report.
-   - **Dependency vulnerability, not exploitable in Harbor Next** → treat as a normal dependency update through Renovate, not a Harbor Next advisory. Explain and close.
-   - **Wrong repo** (e.g. an upstream `goharbor/harbor` issue that does not affect Harbor Next code) → point the reporter to the right project's security policy and close.
+   - **Dependency vulnerability, not exploitable in 8gcr** → treat as a normal dependency update through Renovate, not a 8gcr advisory. Explain and close.
+   - **Wrong repo** (e.g. an upstream `goharbor/harbor` issue that does not affect 8gcr code) → point the reporter to the right project's security policy and close.
    - **Plausible product vulnerability** → continue to triage.
 
 ## 2. Triage
@@ -58,7 +58,7 @@ While a fix is in progress, post a status update in the advisory thread at least
 
 Do **not** develop the fix in the public repository. Public commits, branches, or PRs leak the vulnerability before disclosure.
 
-1. In the draft advisory, click **Start a temporary private fork**. GitHub creates `harbor-next-ghsa-xxxx-xxxx-xxxx`, visible only to advisory collaborators.
+1. In the draft advisory, click **Start a temporary private fork**. GitHub creates `8gcr-ghsa-xxxx-xxxx-xxxx`, visible only to advisory collaborators.
 2. Add collaborators as needed via the advisory's collaborator list. The reporter is already a collaborator; add only the maintainers actually working the fix. Access is scoped to this one advisory and cleaned up automatically.
 3. Develop and review the fix as PRs inside the private fork. Keep the commit message neutral — it becomes public on disclosure, but should not read as a public spoiler if seen early.
 4. **CI does not run on private forks.** Run the test suite locally (`task test:quick`, `task test:ci`) and record in the advisory thread what was run and the results. Do not merge an untested fix.
@@ -66,7 +66,7 @@ Do **not** develop the fix in the public repository. Public commits, branches, o
 
 ## 4. CVE request
 
-For confirmed vulnerabilities in Harbor Next code:
+For confirmed vulnerabilities in 8gcr code:
 
 1. In the draft advisory, choose **Request CVE**. GitHub (acting as CNA) reviews the request, usually within **72 hours**, and reserves a CVE ID bound to the advisory. The CVE is published to MITRE only when the advisory is published.
 2. If the affected component is covered by another CNA (e.g. the vulnerability is really in a vendored/upstream component), GitHub may decline; coordinate with that component's security team instead and reference their CVE in our advisory.
@@ -90,11 +90,11 @@ Order matters — the fix must be available when the advisory goes public:
 5. Click **Publish advisory**. This makes the advisory public, publishes the CVE to MITRE, and submits it to the GitHub Advisory Database (review can take up to 72h; Dependabot alerts then reach downstream Go-module consumers).
 6. The temporary private fork is deleted automatically after publication.
 
-Note: Dependabot alerts only reach consumers of Harbor Next **Go modules**, not users running container images. Image users learn about the fix from the advisory, the release notes, and the registry tags — which is why step 2's release-note convention is mandatory.
+Note: Dependabot alerts only reach consumers of the `github.com/goharbor/harbor/src` **Go module**, not users running container images. Image users learn about the fix from the advisory, the release notes, and the registry tags — which is why step 2's release-note convention is mandatory.
 
 ## 7. After disclosure
 
-- Verify the advisory appears under [published advisories](https://github.com/container-registry/harbor-next/security/advisories) and the CVE record is live.
+- Verify the advisory appears under [published advisories](https://github.com/container-registry/8gcr/security/advisories) and the CVE record is live.
 - Post-mortem (optional but encouraged for High/Critical): what allowed the bug, whether a test/linter/scanner could catch the class, and file follow-up issues.
 - If the issue also affects upstream `goharbor/harbor`, make sure upstream's security team was informed **before** our disclosure, not after.
 
@@ -119,5 +119,5 @@ Note: Dependabot alerts only reach consumers of Harbor Next **Go modules**, not 
 ## Open items (need org-level decisions)
 
 - **Security responder roster**: create a GitHub team with the org **security manager** role instead of relying on repo admins, so the roster is explicit and auditable.
-- **Distributor/operator embargo list**: upstream Harbor uses `cncf-harbor-distributors-announce`; Harbor Next has no equivalent yet. Decide if/when one is needed.
+- **Distributor/operator embargo list**: upstream Harbor uses `cncf-harbor-distributors-announce`; 8gcr has no equivalent yet. Decide if/when one is needed.
 - **security.txt**: publish `/.well-known/security.txt` on the project website pointing at the GitHub report form (requires a website/domain decision, plus a yearly `Expires` refresh).

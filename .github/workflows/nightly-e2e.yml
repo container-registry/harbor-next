@@ -3,7 +3,7 @@ name: E2E
 # The end-to-end suite, run against a published image set.
 #
 # The suite does not live in this repository. It lives on the `dev` overlay
-# branch in container-registry/8gcr, alongside the taskfile that drives it,
+# branch in container-registry/8gcr-ee, alongside the taskfile that drives it,
 # and it is brought here the same way the commercial patches are: octopused
 # onto this commit by `task apply-patches`. A run therefore stands in the
 # megamerge the images under test were built from — main, the declared
@@ -49,7 +49,7 @@ on:
       scenarios_failed:
         value: ${{ jobs.report.outputs.scenarios_failed }}
     secrets:
-      # Reads the commercial patch branches and the dev overlay out of 8gcr,
+      # Reads the commercial patch branches and the dev overlay out of 8gcr-ee,
       # the same way the image build reads the patches.
       SYNC_APP_PRIVATE_KEY:
         required: true
@@ -73,9 +73,9 @@ on:
         type: choice
         options: [images, nightly]
       overlay:
-        # Lets a suite change on an 8gcr branch run against published images
+        # Lets a suite change on an 8gcr-ee branch run against published images
         # before it reaches dev. Scheduled and release runs always use dev.
-        description: 8gcr overlay branch that carries the suite
+        description: 8gcr-ee overlay branch that carries the suite
         required: false
         default: dev
         type: string
@@ -154,7 +154,7 @@ jobs:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
-          repositories: 8gcr
+          repositories: 8gcr-ee
           # Reading the patch branches and the overlay is all this needs.
           permission-contents: read
 

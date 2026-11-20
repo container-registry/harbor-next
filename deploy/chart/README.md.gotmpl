@@ -10,11 +10,15 @@
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
 ```
+
+> **Coming from `charts/harbor`?** The same chart is now published as
+> `charts/8gcr` and, for now, still under the old name. Switching needs no values
+> changes, see [MIGRATION.md](docs/MIGRATION.md#chart-renamed-to-8gcr).
 
 > **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
 > publicly known. Set a strong password via `harborAdminPassword` (or, better, a
@@ -23,7 +27,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 
 ## Why This Chart?
 
-This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next):
+This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [8gcr](https://github.com/container-registry/8gcr):
 
 | Feature | Legacy harbor-helm | This Chart |
 |---------|-------------------|------------|
@@ -146,7 +150,7 @@ kubectl -n harbor create secret generic my-harbor-db \
 kubectl -n harbor create secret generic my-harbor-admin \
   --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -157,7 +161,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
@@ -175,7 +179,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 
 ### Image source and registry
 
-By default the chart pulls the 8gcr Harbor Next images. Switch every component to
+By default the chart pulls the 8gcr images. Switch every component to
 the upstream goharbor images (`docker.io/goharbor/*`) with a single value:
 
 ```yaml

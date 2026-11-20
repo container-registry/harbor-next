@@ -155,16 +155,16 @@ tasks:
         printf '\npredecessor tests passed\n'
 
   dispatch-release-cut:
-    desc: "Tell 8gcr a release shipped so it stamps changelog markers (TAG_NAME, TARGET_SHA, LINE, DISPATCH_TOKEN)"
+    desc: "Tell 8gcr-ee a release shipped so it stamps changelog markers (TAG_NAME, TARGET_SHA, LINE, DISPATCH_TOKEN)"
     preconditions:
       - sh: test -n "${TAG_NAME:-}"
         msg: "TAG_NAME is required (for example, v2.16.0)"
       - sh: test -n "${TARGET_SHA:-}"
-        msg: "TARGET_SHA is required (the released harbor-next commit)"
+        msg: "TARGET_SHA is required (the released 8gcr commit)"
       - sh: test -n "${LINE:-}"
         msg: "LINE is required (main or release-X.Y)"
       - sh: test -n "${DISPATCH_TOKEN:-}"
-        msg: "DISPATCH_TOKEN is required (token with write access to container-registry/8gcr)"
+        msg: "DISPATCH_TOKEN is required (token with write access to container-registry/8gcr-ee)"
       - sh: command -v jq >/dev/null 2>&1
         msg: "jq is required"
       - sh: command -v curl >/dev/null 2>&1
@@ -180,7 +180,7 @@ tasks:
           -H "Content-Type: application/json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
-          "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+          "https://api.github.com/repos/container-registry/8gcr-ee/dispatches" \
           -d "${payload}"
 
   preview:

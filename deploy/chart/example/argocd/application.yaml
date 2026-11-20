@@ -20,7 +20,7 @@ spec:
           - $values/deploy/chart/example/argocd/values.yaml
     # Point at your own repo/revision in production. Pin a chart tag here
     # once one ships this file.
-    - repoURL: https://github.com/container-registry/harbor-next
+    - repoURL: https://github.com/container-registry/8gcr
       targetRevision: main
       ref: values
   syncPolicy:
