@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verify.sh — Verify Harbor Next deployment on AWS EKS with IRSA
+# verify.sh — Verify 8gcr deployment on AWS EKS with IRSA
 #
 # Tests: port-forward, docker login, push, pull, S3 storage, IAM auth logs.
 #
@@ -33,7 +33,7 @@ check() {
   fi
 }
 
-echo "=== Harbor Next IRSA Verification ==="
+echo "=== 8gcr IRSA Verification ==="
 echo ""
 
 # --- Pods ---

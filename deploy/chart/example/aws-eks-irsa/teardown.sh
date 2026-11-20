@@ -26,7 +26,7 @@ POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${IAM_POLICY_NAME}"
 DB_SUBNET_GROUP="${CLUSTER_NAME}-db"
 SG_NAME="${CLUSTER_NAME}-aurora"
 
-echo "=== Teardown: Harbor Next AWS EKS IRSA ==="
+echo "=== Teardown: 8gcr AWS EKS IRSA ==="
 echo "Account: ${AWS_ACCOUNT_ID}, Region: ${AWS_REGION}"
 echo ""
 

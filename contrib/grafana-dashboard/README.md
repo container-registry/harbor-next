@@ -73,7 +73,7 @@ the service label described above.
 2. In Grafana, open **Dashboards → New → Import**, upload the JSON and import it.
 3. Choose the Prometheus **Data source**, then Cluster and Namespace at the top.
 
-With the [Harbor Next Helm chart](../../deploy/chart/README.md), set
+With the [8gcr Helm chart](../../deploy/chart/README.md), set
 `metrics.grafanaDashboard.enabled: true`. The chart embeds the same JSON in a
 ConfigMap for a Grafana dashboard sidecar, such as the one in kube-prometheus-stack.
 The sidecar must watch the ConfigMap's namespace and labels. See the

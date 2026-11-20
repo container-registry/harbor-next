@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/container-registry/harbor-next/deploy/chart/values.schema.json",
-  "title": "Harbor Next Helm Chart Values",
-  "description": "Schema for Harbor Next Helm chart values.yaml validation",
+  "$id": "https://github.com/container-registry/8gcr/deploy/chart/values.schema.json",
+  "title": "8gcr Helm Chart Values",
+  "description": "Schema for 8gcr Helm chart values.yaml validation",
   "type": "object",
   "additionalProperties": false,
   "required": ["externalURL"],
@@ -39,7 +39,7 @@
           "type": "string",
           "enum": ["8gcr", "upstream"],
           "default": "8gcr",
-          "description": "Image source preset: 8gcr (Harbor Next builds) or upstream (docker.io/goharbor/*). Selects the registry + per-component repository."
+          "description": "Image source preset: 8gcr (8gcr builds) or upstream (docker.io/goharbor/*). Selects the registry + per-component repository."
         },
         "pullPolicy": {
           "type": "string",

@@ -1,7 +1,7 @@
 publiccodeYmlVersion: "0.4"
 name: Harbor
-url: https://github.com/container-registry/harbor-next
-landingURL: https://github.com/container-registry/harbor-next
+url: https://github.com/container-registry/8gcr
+landingURL: https://github.com/container-registry/8gcr
 isBasedOn: https://github.com/goharbor/harbor
 softwareVersion: 2.15.8
 releaseDate: 2026-08-26
@@ -16,7 +16,7 @@ categories:
 organisation:
   uri: https://container-registry.com/
   name: 8gears AG
-roadmap: https://github.com/container-registry/harbor-next/blob/main/ROADMAP.md
+roadmap: https://github.com/container-registry/8gcr/blob/main/ROADMAP.md
 developmentStatus: stable
 softwareType: standalone/web
 description:
@@ -45,7 +45,7 @@ description:
       deployments. It is maintained by 8gears and used across enterprises,
       government agencies and cloud providers.
     documentation: https://goharbor.io/docs/
-    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/harbor-next/main/api/v2.0/swagger.yaml
+    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/8gcr/main/api/v2.0/swagger.yaml
     features:
       - Storage of container images, Helm charts and any OCI artifact
       - Role-based access control per project with LDAP, Active Directory and
@@ -84,7 +84,7 @@ description:
       Harbor Satellite im Edge-Betrieb. Sie wird von 8gears gepflegt und in
       Unternehmen, Behörden und bei Cloud-Anbietern eingesetzt.
     documentation: https://goharbor.io/docs/
-    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/harbor-next/main/api/v2.0/swagger.yaml
+    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/8gcr/main/api/v2.0/swagger.yaml
     features:
       - Speicherung von Container-Images, Helm-Charts und beliebigen
         OCI-Artefakten

@@ -1,6 +1,6 @@
-# harbor
+# 8gcr
 
-A modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud-native container registry for Kubernetes.
+A modern, production-ready Helm chart for [8gcr](https://github.com/container-registry/8gcr) - the cloud-native container registry for Kubernetes.
 
 ## TL;DR
 
@@ -9,11 +9,15 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
 ```
+
+> **Coming from `charts/harbor`?** The same chart is now published as
+> `charts/8gcr` and, for now, still under the old name. Switching needs no values
+> changes, see [MIGRATION.md](docs/MIGRATION.md#chart-renamed-to-8gcr).
 
 > **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
 > publicly known. Set a strong password via `harborAdminPassword` (or, better, a
@@ -22,7 +26,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 
 ## Why This Chart?
 
-This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next):
+This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [8gcr](https://github.com/container-registry/8gcr):
 
 | Feature | Legacy harbor-helm | This Chart |
 |---------|-------------------|------------|
@@ -145,7 +149,7 @@ kubectl -n harbor create secret generic my-harbor-db \
 kubectl -n harbor create secret generic my-harbor-admin \
   --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -156,7 +160,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
@@ -174,7 +178,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 
 ### Image source and registry
 
-By default the chart pulls the 8gcr Harbor Next images. Switch every component to
+By default the chart pulls the 8gcr images. Switch every component to
 the upstream goharbor images (`docker.io/goharbor/*`) with a single value:
 
 ```yaml
@@ -924,7 +928,7 @@ Kubernetes: `>=1.28.0-0`
 | harborAdminPassword | string | `""` | Harbor admin password (initial setup). **REQUIRED** unless `existingSecretAdminPassword` is set. Do not use the legacy default `Harbor12345` — it is publicly known. For production reference a pre-created Secret via `existingSecretAdminPassword` rather than passing the value here. Rotate from the Harbor UI after first login. |
 | image | object | `{"pullPolicy":"IfNotPresent","source":"8gcr"}` | Global image settings |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for all Harbor components |
-| image.source | string | `"8gcr"` | Image source preset: `8gcr` (Harbor Next builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon` and trivy to `trivy-adapter-photon`). |
+| image.source | string | `"8gcr"` | Image source preset: `8gcr` (8gcr builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon` and trivy to `trivy-adapter-photon`). |
 | imageCredentials | object | `{}` | Credentials to pull images imageCredentials:   registry: xyz.com   username: xxx   password: yyy   email: zzz@xyz.com |
 | imagePullSecrets | list | [] | List of image pull secrets |
 | ingress | object | `{"annotations":{"nginx.ingress.kubernetes.io/proxy-body-size":"0"},"autoGenCert":true,"className":"","core":"","enabled":true,"hosts":[],"labels":{},"tls":[]}` | Ingress configuration |

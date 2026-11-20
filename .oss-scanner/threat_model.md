@@ -1,7 +1,7 @@
 # Threat model
 
 ## What this project does and where untrusted input enters
-Harbor Next is an independently maintained, downstream distribution of Harbor (goharbor/harbor), a cloud native OCI registry. It stores and distributes container images, Helm charts and other OCI artifacts, and adds projects, RBAC, robot accounts, replication, proxy cache, vulnerability scanning, signing/SBOM accessories, webhooks, quotas, retention and immutability on top of the embedded distribution registry.
+8gcr is an independently maintained, downstream distribution of Harbor (goharbor/harbor), a cloud native OCI registry. It stores and distributes container images, Helm charts and other OCI artifacts, and adds projects, RBAC, robot accounts, replication, proxy cache, vulnerability scanning, signing/SBOM accessories, webhooks, quotas, retention and immutability on top of the embedded distribution registry.
 
 Go services (all under `src/`):
 - `core` (`src/core/`): REST API v2.0 (`src/server/v2.0/handler/`, generated from `api/v2.0/swagger.yaml`), the OCI Distribution API front (`src/server/registry/`) and the middleware chain in front of the registry (`src/server/middleware/`), the token service (`src/core/service/token/`), and authentication.
