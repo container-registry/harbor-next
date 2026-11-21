@@ -28,6 +28,8 @@ jobs:
       contents: write
       # opens the PRs and labels them
       pull-requests: write
+      # records parked picks on the tracking issue
+      issues: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
@@ -54,6 +56,9 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y jq
           fi
+
+      - name: Test script
+        run: .github/scripts/upstream-cherry-pick_test.sh
 
       - name: Open PRs
         run: .github/scripts/upstream-cherry-pick.sh
