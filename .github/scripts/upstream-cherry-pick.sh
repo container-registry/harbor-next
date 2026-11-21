@@ -12,6 +12,13 @@ GH_REPO="${GH_REPO:-${GITHUB_REPOSITORY:-}}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
 GIT_USER_NAME="${GIT_USER_NAME:-github-actions[bot]}"
 PATCH_DIR="${PATCH_DIR:-upstream-patches}"
+# Comma-separated git author names whose upstream commits are never picked.
+# Dependabot bumps are skipped because Renovate already updates the
+# same dependencies directly on this repository. Set it empty to skip nobody.
+SKIP_AUTHORS="${SKIP_AUTHORS-dependabot[bot]}"
+# Commits touching these paths are picked even from a skipped author:
+# Renovate does not manage npm here, so upstream npm bumps still flow.
+SKIP_AUTHORS_KEEP_PATHS="${SKIP_AUTHORS_KEEP_PATHS-(^|/)package(-lock)?\.json$}"
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -90,6 +97,27 @@ is_handled() {
   fi
 
   handled_in_git_log "${sha}"
+}
+
+skipped_author() {
+  local sha=$1
+  local author
+  local files
+  local skip
+  local skips=()
+
+  author=$(git show -s --format=%an "${sha}")
+  IFS=',' read -r -a skips <<<"${SKIP_AUTHORS}"
+  for skip in "${skips[@]}"; do
+    if [ -n "${skip}" ] && [ "${author}" = "${skip}" ]; then
+      files=$(git diff-tree --no-commit-id --name-only -r "${sha}")
+      if [ -n "${SKIP_AUTHORS_KEEP_PATHS}" ] && grep -Eq "${SKIP_AUTHORS_KEEP_PATHS}" <<<"${files}"; then
+        return 1
+      fi
+      return 0
+    fi
+  done
+  return 1
 }
 
 single_parent_commit() {
@@ -422,6 +450,10 @@ main() {
   for sha in "${candidates[@]}"; do
     if ! single_parent_commit "${sha}"; then
       echo "skip merge commit: ${sha}"
+      continue
+    fi
+    if skipped_author "${sha}"; then
+      echo "skip author: ${sha} $(git show -s --format=%s "${sha}")"
       continue
     fi
     cherry_pick_commit "${sha}"
