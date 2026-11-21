@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/proxycachesecret"
 	"github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/sbom"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -168,6 +169,10 @@ func Middleware() func(http.Handler) http.Handler {
 				accData.Type = model.TypeCosignSignature
 			case mediaTypeHarborSBOM:
 				accData.Type = model.TypeHarborSBOM
+			case sbom.MediaTypeSPDX:
+				accData.Type = model.TypeExternalSPDX
+			case sbom.MediaTypeCycloneDX:
+				accData.Type = model.TypeExternalCycloneDX
 			}
 			if subjectArt != nil {
 				accData.SubArtifactID = subjectArt.ID

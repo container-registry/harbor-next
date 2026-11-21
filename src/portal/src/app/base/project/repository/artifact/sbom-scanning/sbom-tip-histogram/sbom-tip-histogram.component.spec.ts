@@ -112,4 +112,28 @@ describe('SbomTipHistogramComponent', () => {
             );
         });
     });
+
+    it('Test SbomTipHistogramComponent getSbomAccessories', () => {
+        fixture.whenStable().then(() => {
+            component.accessories = [
+                { type: 'sbom.harbor' },
+                { type: 'sbom.external.spdx' },
+                { type: 'sbom.external.cyclonedx' },
+                { type: 'signature.cosign' },
+            ] as any;
+
+            const sbomAccs = component.getSbomAccessories();
+            expect(sbomAccs.length).toBe(3);
+            expect(sbomAccs.some(a => a.type === 'sbom.harbor')).toBeTruthy();
+            expect(
+                sbomAccs.some(a => a.type === 'sbom.external.spdx')
+            ).toBeTruthy();
+            expect(
+                sbomAccs.some(a => a.type === 'sbom.external.cyclonedx')
+            ).toBeTruthy();
+            expect(
+                sbomAccs.some(a => a.type === 'signature.cosign')
+            ).toBeFalsy();
+        });
+    });
 });
