@@ -23,7 +23,6 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -46,9 +45,10 @@ const webhookEgressPolicyEnv = "HARBOR_WEBHOOK_EGRESS_POLICY"
 // points it.
 const webhookEgressAllowlistEnv = "HARBOR_WEBHOOK_EGRESS_ALLOWLIST"
 
-// privateNetworkAccessEnv is the deprecated boolean from 2.15. When the policy is not set it keeps
-// its meaning: true allows everything, false allows public destinations only.
-const privateNetworkAccessEnv = "HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS"
+// removedPrivateNetworkAccessEnv is the boolean from 2.15 that the policy replaced. It no longer
+// selects a level; a leftover value without a policy pins public_only so that dropping it can
+// never widen egress for a deployment that had set it to false.
+const removedPrivateNetworkAccessEnv = "HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS"
 
 // Exceptions and denials follow the IANA IPv4/IPv6 special-purpose address registries.
 // A destination is "public" only when it is global-unicast, not private, and not in any
@@ -167,7 +167,7 @@ var egressPolicyCache struct {
 // currentEgressPolicy reads the policy from the environment, re-parsing only when it changed so
 // that invalid and deprecated values are logged once rather than on every dial.
 func currentEgressPolicy() egressPolicy {
-	policyEnv, legacyEnv, allowlist := os.Getenv(webhookEgressPolicyEnv), os.Getenv(privateNetworkAccessEnv), os.Getenv(webhookEgressAllowlistEnv)
+	policyEnv, legacyEnv, allowlist := os.Getenv(webhookEgressPolicyEnv), os.Getenv(removedPrivateNetworkAccessEnv), os.Getenv(webhookEgressAllowlistEnv)
 	egressPolicyCache.Lock()
 	defer egressPolicyCache.Unlock()
 	cache := &egressPolicyCache
@@ -206,10 +206,14 @@ func parseEgressPolicy(policyEnv, legacyEnv, allowlist string) egressPolicy {
 	return policy
 }
 
-// parseEgressLevel applies the policy, then the deprecated boolean, then the default. An invalid
-// value falls back to public_only so that a typo can never widen egress.
-func parseEgressLevel(policyEnv, legacyEnv string) egressLevel {
+// parseEgressLevel applies the policy, then the default. An invalid policy, or a leftover removed
+// boolean without a policy, falls back to public_only so that neither can widen egress.
+func parseEgressLevel(policyEnv, removedEnv string) egressLevel {
+	removedSet := strings.TrimSpace(removedEnv) != ""
 	if value := strings.ToLower(strings.TrimSpace(policyEnv)); value != "" {
+		if removedSet {
+			log.Warningf("%s was removed and is ignored because %s is set", removedPrivateNetworkAccessEnv, webhookEgressPolicyEnv)
+		}
 		for level, name := range egressLevelNames {
 			if value == name {
 				return level
@@ -218,22 +222,12 @@ func parseEgressLevel(policyEnv, legacyEnv string) egressLevel {
 		log.Warningf("invalid %s=%q, allowing public webhook targets only", webhookEgressPolicyEnv, policyEnv)
 		return egressPublicOnly
 	}
-	value := strings.TrimSpace(legacyEnv)
-	if value == "" {
-		return egressAllowAll
-	}
-	allowed, err := strconv.ParseBool(value)
-	switch {
-	case err != nil:
-		log.Warningf("invalid %s=%q, allowing public webhook targets only", privateNetworkAccessEnv, legacyEnv)
-		return egressPublicOnly
-	case allowed:
-		log.Warningf("%s is deprecated, use %s=%s", privateNetworkAccessEnv, webhookEgressPolicyEnv, egressAllowAll)
-		return egressAllowAll
-	default:
-		log.Warningf("%s is deprecated, use %s=%s", privateNetworkAccessEnv, webhookEgressPolicyEnv, egressPublicOnly)
+	if removedSet {
+		log.Errorf("%s=%q was removed, allowing public webhook targets only; set %s to %s, %s or %s instead",
+			removedPrivateNetworkAccessEnv, removedEnv, webhookEgressPolicyEnv, egressAllowAll, egressBlockRestricted, egressPublicOnly)
 		return egressPublicOnly
 	}
+	return egressAllowAll
 }
 
 // unmappedBits keeps an IPv4-mapped prefix such as ::ffff:10.0.0.0/104 equivalent to 10.0.0.0/8.

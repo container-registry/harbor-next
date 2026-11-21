@@ -53,6 +53,8 @@ stale-exempt =::
    targetMemoryUtilizationPercentage"
 - '#/$defs/harborComponent/properties/autoscaling/properties/metrics'
 - '#/$defs/harborComponent/properties/autoscaling/properties/behavior'
+# removed value, kept so harbor.validateValues can fail with a migration hint
+- '#/properties/network/properties/allowPrivateNetworkAccess'
 
 defn main(values-file='values.yaml' schema-file='values.schema.json' mode=''):
   vals =: values-file:read:yaml/load
