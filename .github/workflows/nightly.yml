@@ -61,19 +61,7 @@ jobs:
         run: task nightly:validate-inputs
 
       - name: Configure ephemeral Git authentication
-        run: |
-          askpass="${RUNNER_TEMP}/git-askpass"
-          cat > "${askpass}" <<'EOF'
-          #!/usr/bin/env bash
-          case "$1" in
-            *Username*) printf '%s\n' 'x-access-token' ;;
-            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
-            *) exit 1 ;;
-          esac
-          EOF
-          chmod 700 "${askpass}"
-          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
-          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
+        uses: $/.github/actions/git-askpass
 
       - name: Resolve nightly version
         id: version

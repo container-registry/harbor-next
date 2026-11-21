@@ -1,0 +1,24 @@
+name: Git askpass
+description: >-
+  Point git at an askpass helper that answers with GH_TOKEN from the job
+  environment, so checkouts can keep persist-credentials false and still push.
+
+runs:
+  using: composite
+  steps:
+    - name: Configure ephemeral Git authentication
+      shell: bash
+      # Writes fixed values only: the helper path and a constant.
+      run: | # zizmor: ignore[github-env]
+        askpass="${RUNNER_TEMP}/git-askpass"
+        cat > "${askpass}" <<'EOF'
+        #!/usr/bin/env bash
+        case "$1" in
+          *Username*) printf '%s\n' 'x-access-token' ;;
+          *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+          *) exit 1 ;;
+        esac
+        EOF
+        chmod 700 "${askpass}"
+        echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+        echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
