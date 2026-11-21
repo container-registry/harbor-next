@@ -1,7 +1,8 @@
 apiVersion: v2
 name: harbor
 description: A modern, production-ready Helm chart for
-  [8gcr](https://github.com/container-registry/8gcr) - the cloud-native
+  [Harbor distribution 8gcr](https://github.com/container-registry/8gcr) -
+  the cloud-native
   container registry for Kubernetes.
 type: application
 version: 2.1.1
