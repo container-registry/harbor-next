@@ -55,16 +55,21 @@ database until the upgrade is done. The release is called `harbor` in
 namespace `harbor` here:
 
 ```sh
-kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=0
+kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=0 &&
 kubectl -n harbor wait --for=delete pod --timeout=5m \
-  -l 'app.kubernetes.io/instance=harbor,app.kubernetes.io/component in (core,jobservice)'
+  -l 'app.kubernetes.io/instance=harbor,app.kubernetes.io/component in (core,jobservice)' &&
 kubectl -n harbor exec postgresql-0 -c postgresql -- \
-  sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d "$POSTGRES_DB"' > harbor.sql
+  sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d "$POSTGRES_DB"' > harbor.sql &&
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql &&
-  helm upgrade harbor <chart> -n harbor -f values.yaml
+helm upgrade harbor <chart> -n harbor -f values.yaml
 ```
 
-Run the upgrade only after a complete dump, as above. Then check
+Each step runs only when the one before succeeded, so a failed shutdown or an
+incomplete dump stops before the upgrade. With `core.autoscaling` or
+`jobservice.autoscaling` enabled, the chart sets no replica count and the HPA
+does not scale up from 0, so run
+`kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=1`
+after `helm upgrade`. Then check
 `kubectl -n harbor logs postgresql-0 -c pgdata-upgrade`: the last line starts
 with `upgraded 18/docker to 19/docker`. When Harbor works, remove
 the old directory, which still holds the PostgreSQL 18 catalog:

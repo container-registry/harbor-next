@@ -75,9 +75,9 @@ starts on the linked files, the PostgreSQL 18 copy can no longer be started:
 cd deploy/compose
 
 # 1. With the OLD compose file: stop Harbor's writers, dump the database
-docker compose stop core jobservice
+docker compose stop core jobservice &&
 docker compose exec -T postgresql \
-  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql &&
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
 
 # 2. Only after "dump OK": stop, switch to the new compose file, start.
