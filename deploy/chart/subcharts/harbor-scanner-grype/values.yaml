@@ -1,0 +1,131 @@
+# -- Deploy the Grype scanner adapter (set from the parent chart)
+enabled: false
+
+# -- Override the name part of resource names (`<release>-<nameOverride>`)
+nameOverride: ""
+# -- Override the full resource name
+fullnameOverride: ""
+
+global:
+  # -- Registry host override shared with the parent chart; wins over `image.registry`
+  imageRegistry: ""
+  # -- Priority class shared with the parent chart; `priorityClassName` wins
+  priorityClassName: ""
+
+image:
+  # -- Adapter image registry host
+  registry: 8gears.container-registry.com
+  # -- Adapter image repository (path without registry host)
+  repository: 8gcr/harbor-grype-adapter
+  # -- Adapter image tag; ignored when `image.digest` is set
+  tag: latest
+  # -- Adapter image digest. Pinned because the image only publishes a `latest` tag
+  digest: sha256:3255d97c62e6e638e6786eae2fc1635059c014c4de57d067b66d16cdeed289dc
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secret names. The parent chart's `imagePullSecrets` and
+# `imageCredentials` do not reach a subchart, so repeat them here
+imagePullSecrets: []
+
+# How the parent chart registers this adapter in Harbor (POST /api/v2.0/scanners).
+registration:
+  # -- Register the adapter in Harbor after install and upgrade
+  enabled: true
+  # -- Scanner name shown in Harbor. `Trivy` is reserved by Harbor
+  name: Grype
+  # -- Scanner description shown in Harbor
+  description: Grype scanner adapter
+  # -- Make this scanner the system default
+  default: false
+  # -- Hand the adapter Harbor's in-cluster registry address instead of `externalURL`
+  useInternalAddr: true
+  # -- Skip TLS verification when Harbor calls the adapter
+  skipCertVerify: false
+  # -- Adapter URL Harbor calls; empty derives the in-cluster Service URL
+  url: ""
+
+# -- Adapter settings as plain environment variables (`SCANNER_GRYPE_*`, `SCANNER_SYFT_*`)
+config:
+  SCANNER_GRYPE_SCOPE: squashed
+
+# -- Extra environment variables with valueFrom support
+extraEnv: []
+# -- Extra volumes, for example a Secret with a private CA bundle
+extraVolumes: []
+# -- Extra volume mounts for the adapter container
+extraVolumeMounts: []
+
+service:
+  # -- Service port Harbor calls
+  port: 8080
+
+# Full Kubernetes probe specs; set one to null to omit it. Overrides merge
+# into the defaults, so set `httpGet: null` when switching to another handler.
+probes:
+  # -- Startup probe
+  startup:
+    httpGet:
+      path: /probe/ready
+      port: api-server
+    periodSeconds: 2
+    failureThreshold: 30
+    timeoutSeconds: 2
+  # -- Readiness probe
+  readiness:
+    httpGet:
+      path: /probe/ready
+      port: api-server
+    periodSeconds: 5
+    timeoutSeconds: 2
+  # -- Liveness probe
+  liveness:
+    httpGet:
+      path: /probe/healthy
+      port: api-server
+    periodSeconds: 10
+    timeoutSeconds: 3
+
+# -- Adapter resource requests and limits
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+
+cache:
+  # -- Size limit of the emptyDir holding the Grype database and pulled layers
+  sizeLimit: 10Gi
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# -- Labels added to the Deployment and Service (the parent chart's
+# `commonLabels` do not reach a subchart); the chart's own label keys win
+commonLabels: {}
+# -- Pod annotations
+podAnnotations: {}
+# -- Pod labels
+podLabels: {}
+# -- Node selector
+nodeSelector: {}
+# -- Tolerations
+tolerations: []
+# -- Affinity
+affinity: {}
+# -- Priority class name
+priorityClassName: ""

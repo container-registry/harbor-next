@@ -1,0 +1,13 @@
+# Both scanner subcharts on, Grype as the default scanner.
+externalURL: https://harbor.example.com
+database:
+  host: db.example.com
+harborAdminPassword: Harbor12345
+harbor-scanner-grype:
+  enabled: true
+  registration:
+    default: true
+harbor-scanner-snyk:
+  enabled: true
+  snyk:
+    existingSecret: snyk-token

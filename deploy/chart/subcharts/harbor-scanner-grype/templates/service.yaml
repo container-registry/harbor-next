@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harbor-scanner-grype.fullname" . | quote }}
+  labels:
+    {{- include "harbor-scanner-grype.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: api-server
+      port: {{ .Values.service.port }}
+      targetPort: api-server
+      protocol: TCP
+  selector:
+    {{- include "harbor-scanner-grype.selectorLabels" . | nindent 4 }}

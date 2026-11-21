@@ -165,7 +165,7 @@ Component name helpers (used by noProxy and other cross-component references)
 {{- end -}}
 
 {{- define "harbor.noProxy" -}}
-  {{- printf "%s,%s,%s,%s,%s,%s,%s,%s" (include "harbor.core" .) (include "harbor.jobservice" .) (include "harbor.database" .) (include "harbor.registry" .) (include "harbor.portal" .) (include "harbor.trivy" .) (include "harbor.exporter" .) .Values.proxy.noProxy -}}
+  {{- printf "%s,%s,%s,%s,%s,%s,%s%s,%s" (include "harbor.core" .) (include "harbor.jobservice" .) (include "harbor.database" .) (include "harbor.registry" .) (include "harbor.portal" .) (include "harbor.trivy" .) (include "harbor.exporter" .) (include "harbor.scannerRegistration.noProxy" .) .Values.proxy.noProxy -}}
 {{- end -}}
 
 {{/*
@@ -207,3 +207,99 @@ Return the core external URL (same as externalURL for now)
 {{- define "harbor.coreURL" -}}
 {{- include "harbor.externalURL" . }}
 {{- end }}
+
+{{/*
+=============================================================================
+Scanner registration helpers
+=============================================================================
+*/}}
+
+{{/*
+Scanner adapters the registration Job reconciles, as YAML under `items`.
+Any `harbor-scanner-*` subchart that ships a `registration` block is picked up,
+so a new scanner subchart needs no template change here. `present` marks a
+scanner to register, `stale` a disabled subchart whose registration the Job
+removes; `registration.enabled: false` sets neither. `adopt` allows the rename
+lookup by URL. Removal and adoption only apply to the chart-derived Service URL. The Service name mirrors
+the subcharts' fullname helpers.
+*/}}
+{{- define "harbor.scannerRegistrations" -}}
+{{- $root := . -}}
+{{- $items := list -}}
+{{- $selectors := dict (include "harbor.name" .) "the harbor chart" -}}
+{{- range $key := keys .Values | sortAlpha -}}
+{{- $sub := index $root.Values $key -}}
+{{- if and (hasPrefix "harbor-scanner-" $key) (kindIs "map" $sub) -}}
+{{- $reg := $sub.registration -}}
+{{- if kindIs "map" $reg -}}
+{{- $name := default $key $sub.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- $room := int (sub 62 (len $name)) -}}
+{{- $release := $root.Release.Name -}}
+{{- if gt (len $release) $room -}}
+{{- $release = printf "%s-%s" ($release | trunc (int (max 0 (sub $room 9))) | trimSuffix "-") (printf "h%s" (sha256sum $release | trunc 7)) -}}
+{{- end -}}
+{{- $fullname := printf "%s-%s" $release $name | trimPrefix "-" -}}
+{{- $fullname = default $fullname $sub.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- $url := default (printf "http://%s:%v" $fullname (($sub.service).port | default 8080)) $reg.url -}}
+{{- $managed := ne (toString $reg.enabled) "false" -}}
+{{- $deployed := eq (toString $sub.enabled) "true" -}}
+{{- if $deployed -}}
+{{- if hasKey $selectors $name -}}
+{{- fail (printf "%s and %s share the name %q, so their Services would select each other's pods: give the scanner a different nameOverride" (get $selectors $name) $key $name) -}}
+{{- end -}}
+{{- $_ := set $selectors $name $key -}}
+{{- end -}}
+{{- $items = append $items (dict "name" ($reg.name | default "" | toString) "description" ($reg.description | default "") "url" $url "default" (eq (toString $reg.default) "true") "useInternalAddr" (ne (toString $reg.useInternalAddr) "false") "skipCertVerify" (eq (toString $reg.skipCertVerify) "true") "present" (and $deployed $managed) "stale" (and (not $deployed) $managed (empty $reg.url) (not (empty $reg.name))) "deployed" $deployed "adopt" (empty $reg.url) "host" $fullname) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- /* --reuse-values from a release before this block existed has no scannerRegistration key */ -}}
+{{- range (.Values.scannerRegistration).extra -}}
+{{- $items = append $items (dict "name" .name "description" (.description | default "") "url" .url "default" (eq (toString .default) "true") "useInternalAddr" (eq (toString .useInternalAddr) "true") "skipCertVerify" (eq (toString .skipCertVerify) "true") "present" true "stale" false "deployed" false "adopt" false "host" "") -}}
+{{- end -}}
+{{- /* Harbor stores adapter URLs with a lowercase host and no trailing slash; match that so lookups by URL hit. */ -}}
+{{- $jobOn := ne (toString (.Values.scannerRegistration).enabled) "false" -}}
+{{- range $items -}}
+{{- if and $jobOn (or .present .stale) -}}
+{{- $u := urlParse (toString .url) -}}
+{{- $rest := list (ternary "" (printf "?%s" $u.query) (empty $u.query)) (ternary "" (printf "#%s" $u.fragment) (empty $u.fragment)) | join "" -}}
+{{- $_ := set . "url" (printf "%s://%s%s%s%s" (lower $u.scheme) (ternary "" (printf "%s@" $u.userinfo) (empty $u.userinfo)) (lower $u.host) (regexReplaceAll "/+$" $u.path "") $rest) -}}
+{{- end -}}
+{{- end -}}
+{{- toYaml (dict "items" $items) -}}
+{{- end -}}
+
+{{/* "true" when the registration Job has at least one scanner to register. */}}
+{{- define "harbor.scannerRegistration.enabled" -}}
+{{- $active := false -}}
+{{- range (fromYaml (include "harbor.scannerRegistrations" .)).items -}}
+{{- if .present }}{{ $active = true }}{{ end -}}
+{{- end -}}
+{{- $sr := .Values.scannerRegistration | default dict -}}
+{{- $missing := not (and ($sr.image).repository (or ($sr.image).tag ($sr.image).digest)) -}}
+{{- range list "enabled" "username" "existingSecretPasswordKey" "backoffLimit" "activeDeadlineSeconds" "podSecurityContext" "securityContext" "resources" -}}
+{{- if not (hasKey $sr .) }}{{ $missing = true }}{{ end -}}
+{{- end -}}
+{{- if and $active (ne (toString $sr.enabled) "false") $missing -}}
+{{- fail "A scanner is enabled but the scannerRegistration defaults are missing, which happens with --reuse-values from a chart that predates them. Pass your values file (helm upgrade -f values.yaml) or use --reset-then-reuse-values." -}}
+{{- end -}}
+{{- and (eq (toString (.Values.scannerRegistration).enabled) "true") $active -}}
+{{- end -}}
+
+{{/*
+Comma-prefixed Service names of deployed scanner subcharts, short and
+namespace-qualified, for noProxy. Empty
+without a proxy, so a scanner toggle does not roll core and jobservice.
+*/}}
+{{- define "harbor.scannerRegistration.noProxy" -}}
+{{- if or .Values.proxy.httpProxy .Values.proxy.httpsProxy -}}
+{{- range (fromYaml (include "harbor.scannerRegistrations" .)).items -}}
+{{- if and .deployed .host -}}
+,{{ .host }},{{ .host }}.{{ $.Release.Namespace }},{{ .host }}.{{ $.Release.Namespace }}.svc
+{{- /* A registration.url that spells out the Service's cluster domain is bypassed as written. */ -}}
+{{- $h := regexReplaceAll "^[a-z]+://([^/:?#]+).*$" (lower (toString .url)) "${1}" -}}
+{{- if hasPrefix (printf "%s.%s.svc." .host $.Release.Namespace | lower) $h }},{{ $h }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

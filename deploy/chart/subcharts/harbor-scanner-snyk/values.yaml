@@ -1,0 +1,138 @@
+# -- Deploy the Snyk scanner adapter (set from the parent chart)
+enabled: false
+
+# -- Override the name part of resource names (`<release>-<nameOverride>`)
+nameOverride: ""
+# -- Override the full resource name
+fullnameOverride: ""
+
+global:
+  # -- Registry host override shared with the parent chart; wins over `image.registry`
+  imageRegistry: ""
+  # -- Priority class shared with the parent chart; `priorityClassName` wins
+  priorityClassName: ""
+
+image:
+  # -- Adapter image registry host
+  registry: 8gears.container-registry.com
+  # -- Adapter image repository (path without registry host)
+  repository: 8gcr/harbor-snyk-adapter
+  # -- Adapter image tag; ignored when `image.digest` is set
+  tag: latest
+  # -- Adapter image digest. Pinned because the image only publishes a `latest` tag
+  digest: sha256:26ae9a8b4251d87afd29a27f92c568069ee07a5a213b493a6637c919e646f548
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secret names. The parent chart's `imagePullSecrets` and
+# `imageCredentials` do not reach a subchart, so repeat them here
+imagePullSecrets: []
+
+# How the parent chart registers this adapter in Harbor (POST /api/v2.0/scanners).
+registration:
+  # -- Register the adapter in Harbor after install and upgrade
+  enabled: true
+  # -- Scanner name shown in Harbor. `Trivy` is reserved by Harbor
+  name: Snyk
+  # -- Scanner description shown in Harbor
+  description: Snyk scanner adapter
+  # -- Make this scanner the system default
+  default: false
+  # -- Hand the adapter Harbor's in-cluster registry address instead of `externalURL`
+  useInternalAddr: true
+  # -- Skip TLS verification when Harbor calls the adapter
+  skipCertVerify: false
+  # -- Adapter URL Harbor calls; empty derives the in-cluster Service URL
+  url: ""
+
+snyk:
+  # -- **Required.** Existing Secret holding the Snyk API token
+  existingSecret: ""
+  # -- Key of the token inside `snyk.existingSecret`
+  tokenKey: SNYK_TOKEN
+  # -- Snyk organization ID or slug scans are attributed to; empty uses the token's default organization
+  org: ""
+
+# -- Adapter settings as plain environment variables (`SCANNER_SNYK_*`)
+config: {}
+
+# -- Extra environment variables with valueFrom support
+extraEnv: []
+# -- Extra volumes, for example a Secret with a private CA bundle
+extraVolumes: []
+# -- Extra volume mounts for the adapter container
+extraVolumeMounts: []
+
+service:
+  # -- Service port Harbor calls
+  port: 8080
+
+# Full Kubernetes probe specs; set one to null to omit it. Overrides merge
+# into the defaults, so set `httpGet: null` when switching to another handler.
+probes:
+  # -- Startup probe
+  startup:
+    httpGet:
+      path: /probe/ready
+      port: api-server
+    periodSeconds: 2
+    failureThreshold: 30
+    timeoutSeconds: 2
+  # -- Readiness probe
+  readiness:
+    httpGet:
+      path: /probe/ready
+      port: api-server
+    periodSeconds: 5
+    timeoutSeconds: 2
+  # -- Liveness probe
+  liveness:
+    httpGet:
+      path: /probe/healthy
+      port: api-server
+    periodSeconds: 10
+    timeoutSeconds: 3
+
+# -- Adapter resource requests and limits
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+cache:
+  # -- Size limit of the emptyDir the Snyk CLI unpacks images into
+  sizeLimit: 10Gi
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# -- Labels added to the Deployment and Service (the parent chart's
+# `commonLabels` do not reach a subchart); the chart's own label keys win
+commonLabels: {}
+# -- Pod annotations
+podAnnotations: {}
+# -- Pod labels
+podLabels: {}
+# -- Node selector
+nodeSelector: {}
+# -- Tolerations
+tolerations: []
+# -- Affinity
+affinity: {}
+# -- Priority class name
+priorityClassName: ""

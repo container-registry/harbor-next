@@ -45,3 +45,5 @@ Taskfile.yml
 .pre-commit-config.yaml
 # Task cache
 .task/
+# Sources of the local scanner subcharts; packaged copies ship in charts/
+subcharts/

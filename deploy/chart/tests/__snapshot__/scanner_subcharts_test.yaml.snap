@@ -1,0 +1,160 @@
+should match the registration Job snapshot:
+  1: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        helm.sh/hook: post-install,post-upgrade,post-rollback
+        helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+      labels:
+        app.kubernetes.io/component: scanner-registration
+        app.kubernetes.io/instance: harbor
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: harbor
+        app.kubernetes.io/version: v9.9.9-test
+        helm.sh/chart: harbor-9.9.9-test
+      name: harbor-scanner-registration
+    spec:
+      activeDeadlineSeconds: 270
+      backoffLimit: 6
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: scanner-registration
+            app.kubernetes.io/instance: harbor
+            app.kubernetes.io/name: harbor
+        spec:
+          automountServiceAccountToken: false
+          containers:
+            - args:
+                - |
+                  call() { # method path [json body]; prints the HTTP status, body lands in /tmp/body
+                    curl -sS --connect-timeout 5 --max-time 60 -o /tmp/body -w '%{http_code}' -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
+                      -X "$1" -H 'Content-Type: application/json' ${3:+-d "$3"} "${HARBOR_API}$2"
+                  }
+                  die() { # prints Harbor's answer with URL credentials masked
+                    echo "$1" >&2
+                    [ ! -f /tmp/body ] || { sed 's#//[^/@ "]*@#//***@#g' /tmp/body >&2; echo >&2; }
+                    exit 1
+                  }
+                  field() { tr -d '\n' < /tmp/body | sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p"; }
+                  reach() { # method path body; sets code, retrying while Harbor cannot reach the adapter yet
+                    n=0
+                    while code=$(call "$@"); do
+                      case "$code" in 5??) ;; *) break ;; esac
+                      n=$((n + 1))
+                      [ "$n" -lt 24 ] || break
+                      echo "adapter not reachable yet (HTTP $code), retrying"
+                      sleep 10
+                    done
+                  }
+                  flag() { tr -d '\n' < /tmp/body | sed -n "s/.*\"$1\": *true.*/true/p"; }
+                  find() { # value [field]; sets id, url, auth and default of the registration with exactly that name (or url)
+                    code=$(curl -sS --connect-timeout 5 --max-time 60 -o /tmp/body -w '%{http_code}' -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
+                      -G --data-urlencode "ex_${2:-name}=$1" "${HARBOR_API}/scanners")
+                    [ "$code" = 200 ] || die "listing scanners failed with HTTP $code"
+                    id=$(field uuid); url=$(field url); auth=$(field auth)
+                    default=$(flag is_default); disabled=$(flag disabled)
+                  }
+                  register() { # name body default url adopt ping-body field...
+                    name=$1 body=$2 mkdefault=$3 want=$4 adopt=$5 ping=$6
+                    shift 6
+                    find "$name"
+                    # A renamed subchart scanner still owns its Service URL, which Harbor keeps unique.
+                    [ -n "$id" ] || [ "$adopt" = false ] || find "$want" url
+                    # Skip the update when every field is already stored, so a read-only Harbor does not fail the release.
+                    same=$id; stored=$(tr -d '\n' < /tmp/body)
+                    for f in "$@"; do
+                      case "$stored" in *"$f"*) ;; *) same= ;; esac
+                    done
+                    if [ -n "$same" ]; then
+                      echo "scanner $name unchanged"
+                    elif [ -n "$id" ]; then
+                      # An update resets what it leaves out, so repeat the deactivated state and the auth type.
+                      body="${body%?},\"disabled\":${disabled:-false}}"
+                      if [ -n "$auth" ]; then
+                        # The stored credential must not follow the registration to another adapter.
+                        [ "$url" = "$want" ] || { rm -f /tmp/body; die "scanner $name has credentials stored for $url: update or remove that registration in Harbor first"; }
+                        body="${body%?},\"auth\":\"$auth\"}"
+                      elif [ -n "$ping" ] && [ "$url" != "$want" ]; then
+                        # Harbor pings an adapter on create only, so check a changed URL before the update.
+                        reach POST /scanners/ping "$ping"
+                        [ "$code" = 200 ] || die "scanner $name does not answer at its adapter URL (HTTP $code)"
+                      fi
+                      code=$(call PUT "/scanners/$id" "$body")
+                      [ "$code" = 200 ] || die "updating scanner $name failed with HTTP $code"
+                      echo "scanner $name updated"
+                    else
+                      reach POST /scanners "$body"
+                      [ "$code" = 201 ] || die "registering scanner $name failed with HTTP $code"
+                      echo "scanner $name registered"
+                      find "$name"
+                    fi
+                    # The default only moves once every scanner is registered.
+                    if [ "$mkdefault" = true ] && [ "$default" != true ]; then defid=$id defname=$name; fi
+                  }
+                  unregister() { # name url; only removes the registration this chart created
+                    find "$1"
+                    if [ -n "$id" ] && [ "$url" = "$2" ]; then
+                      code=$(call DELETE "/scanners/$id")
+                      [ "$code" = 200 ] || die "removing scanner $1 failed with HTTP $code"
+                      echo "scanner $1 removed"
+                      [ "$default" != true ] || echo "warning: scanner $1 was the default; choose a new default scanner in Harbor" >&2
+                    fi
+                  }
+                  defid=
+                  n=0
+                  until curl -fsS --connect-timeout 5 --max-time 10 -o /dev/null "${HARBOR_API}/ping"; do
+                    n=$((n + 1))
+                    [ "$n" -lt 60 ] || die "Harbor core did not answer at ${HARBOR_API}"
+                    sleep 5
+                  done
+                  register 'Grype' '{"description":"Grype scanner adapter","name":"Grype","skip_certVerify":false,"url":"http://harbor-harbor-scanner-grype:8080","use_internal_addr":true}' true 'http://harbor-harbor-scanner-grype:8080' true '{"name":"Grype","url":"http://harbor-harbor-scanner-grype:8080"}' '"description":"Grype scanner adapter"' '"name":"Grype"' '"skip_certVerify":false' '"url":"http://harbor-harbor-scanner-grype:8080"' '"use_internal_addr":true'
+                  if [ -n "$defid" ]; then
+                    code=$(call PATCH "/scanners/$defid" '{"is_default":true}')
+                    [ "$code" = 200 ] || die "setting scanner $defname as default failed with HTTP $code"
+                    echo "scanner $defname set as default"
+                  fi
+                  unregister 'Snyk' 'http://harbor-harbor-scanner-snyk:8080'
+              command:
+                - /bin/sh
+                - -ec
+              env:
+                - name: HARBOR_API
+                  value: http://harbor-core:80/api/v2.0
+                - name: HARBOR_USERNAME
+                  value: admin
+                - name: HARBOR_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: HARBOR_ADMIN_PASSWORD
+                      name: harbor-core
+              image: docker.io/curlimages/curl:8.23.0
+              imagePullPolicy: IfNotPresent
+              name: register
+              resources:
+                limits:
+                  memory: 64Mi
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /tmp
+                  name: tmp
+          restartPolicy: OnFailure
+          securityContext:
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - emptyDir: {}
+              name: tmp
+      ttlSecondsAfterFinished: 3600
