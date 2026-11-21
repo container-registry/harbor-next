@@ -551,8 +551,9 @@ tests:
       - equal:
           path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
           value: ""
-      - notExists:
+      - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: ""
 
   - it: should pass the webhook egress policy through to core
     template: templates/core.configmap.yaml
@@ -572,20 +573,21 @@ tests:
           path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
           value: 10.20.0.0/16,*.svc.cluster.local
 
-  # Pins: the empty default of earlier values files has no effect and still renders.
-  - it: should ignore an empty allowPrivateNetworkAccess
+  # Pins: the deprecated value keeps reaching core, including an explicit false.
+  - it: should pass the deprecated allowPrivateNetworkAccess through to core
     template: templates/core.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      network.allowPrivateNetworkAccess: ""
+      network.allowPrivateNetworkAccess: false
     asserts:
       - equal:
-          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
-          value: block_restricted
-      - notExists:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "false"
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: ""
 
   # Pins: values reused from a release without network.webhookEgress still render.
   - it: should render the legacy values shape without webhookEgress in core
@@ -595,13 +597,31 @@ tests:
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       network.webhookEgress: null
+      network.allowPrivateNetworkAccess: true
     asserts:
       - equal:
           path: data.HARBOR_WEBHOOK_EGRESS_POLICY
-          value: block_restricted
+          value: ""
       - equal:
           path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
           value: ""
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"
+
+  # Pins: an explicit policy wins over the deprecated value.
+  - it: should render an explicit policy next to the deprecated value in core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: true
+      network.webhookEgress.policy: public_only
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
 
   # Pins: with every core key externalized the generated Secret is skipped,
   # so the envFrom secretRef must disappear with it.

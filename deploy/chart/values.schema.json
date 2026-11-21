@@ -215,7 +215,11 @@
       "additionalProperties": false,
       "properties": {
         "allowPrivateNetworkAccess": {
-          "description": "Removed, use network.webhookEgress.policy. Kept in the schema so the chart can fail with a migration message instead of a generic schema error."
+          "enum": [
+            true,
+            false,
+            ""
+          ]
         },
         "webhookEgress": {
           "type": "object",

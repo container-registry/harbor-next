@@ -592,11 +592,6 @@ Validate required values
 {{- if not (hasKey (.Values.postgresql | default dict) "enabled") }}
 {{- fail "Upgrading from a harbor-next 2.15 chart with --reuse-values is not supported: it drops the new chart defaults. Pass your values file (helm upgrade -f values.yaml) or use --reset-then-reuse-values." }}
 {{- end }}
-{{- /* Dropping the removed value silently would widen false (public_only) to the block_restricted default. */}}
-{{- $legacyEgress := (.Values.network | default dict).allowPrivateNetworkAccess }}
-{{- if and (not (kindIs "invalid" $legacyEgress)) (ne (toString $legacyEgress) "") }}
-{{- fail (printf "network.allowPrivateNetworkAccess (%v) was removed: set network.webhookEgress.policy instead (true: allow_all, false: public_only, unset: block_restricted) and remove network.allowPrivateNetworkAccess." $legacyEgress) }}
-{{- end }}
 {{- if not .Values.externalURL }}
 {{- fail "externalURL is required. Please set externalURL in your values." }}
 {{- end }}
@@ -666,13 +661,17 @@ Validate required values
 
 {{/*
 Webhook and Slack egress env for core and jobservice. An empty policy renders
-block_restricted.
+block_restricted unless the deprecated allowPrivateNetworkAccess is set, which
+Harbor then maps (true: allow_all, false: public_only). The deprecated value is
+rendered by the configmaps themselves; empty means unset to Harbor.
 */}}
 {{- define "harbor.webhookEgressEnv" -}}
-{{- $network := .Values.network | default dict -}}
+{{- $network := .Values.network -}}
+{{- $legacy := $network.allowPrivateNetworkAccess -}}
+{{- $legacySet := and (not (kindIs "invalid" $legacy)) (ne (toString $legacy) "") -}}
 {{- /* --reuse-values from a release before webhookEgress existed has no such key */ -}}
 {{- $egress := $network.webhookEgress | default dict -}}
-{{- $policy := $egress.policy | default "block_restricted" -}}
+{{- $policy := $egress.policy | default (ternary "" "block_restricted" $legacySet) -}}
 HARBOR_WEBHOOK_EGRESS_POLICY: {{ $policy | quote }}
 HARBOR_WEBHOOK_EGRESS_ALLOWLIST: {{ join "," ($egress.allowlist | default list) | quote }}
 {{- end -}}
