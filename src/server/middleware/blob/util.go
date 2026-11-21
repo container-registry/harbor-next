@@ -26,18 +26,36 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/requestid"
 )
 
+// touchSkipMaxAge bounds how stale a blob's update_time may be before a Touch
+// is skipped. It is deliberately far below any usable GC window. The row-lock
+// contention the skip exists to remove comes from re-pushes of one digest
+// arriving within seconds of each other, so a few minutes captures nearly all
+// of it, while the liveness margin a skipped Touch leaves stays close to a
+// full GC window instead of collapsing to half of it.
+const touchSkipMaxAge = 5 * time.Minute
+
 // shouldTouchNone decides whether a blob that is already StatusNone still needs
 // a Touch. In that state Touch only bumps version/update_time to coordinate
 // with GC - a redundant single-row UPDATE that, under concurrent re-pushes of
 // the same digest, becomes a row-lock contention hot spot (the lock is held for
-// the whole request transaction on PUT manifest). Skip it while update_time is
-// fresh: GC only considers blobs older than the full time window, so anything
-// younger than half the window cannot become a candidate before this request
-// associates the blob. A non-positive window leaves no such safety margin, so
-// always touch then.
+// the whole request transaction on PUT manifest).
+//
+// Touch never makes a blob ineligible for GC; it only moves update_time
+// forward. GC collects an unassociated blob once
+// "update_time <= now() - window" (pkg/blob/dao.GetBlobsNotRefedByProjectBlob),
+// so skipping the Touch leaves the blob protected for window minus the row's
+// current age rather than for a full window. Bounding the skip to
+// touchSkipMaxAge keeps that margin at window - touchSkipMaxAge, which is the
+// same order as the unconditional-Touch behaviour it replaces. A window that is
+// not comfortably wider than touchSkipMaxAge leaves no margin worth having -
+// including the non-positive values GC_TIME_WINDOW_HOURS accepts without
+// validation - so always touch then.
 func shouldTouchNone(bb *models.Blob) bool {
 	window := time.Duration(config.GetGCTimeWindow()) * time.Hour
-	return window <= 0 || time.Since(bb.UpdateTime) > window/2
+	if window <= 2*touchSkipMaxAge {
+		return true
+	}
+	return time.Since(bb.UpdateTime) > touchSkipMaxAge
 }
 
 // probeBlob handles config/layer and manifest status in the PUT Blob & Manifest middleware, and update the status before it passed into proxy(distribution).
