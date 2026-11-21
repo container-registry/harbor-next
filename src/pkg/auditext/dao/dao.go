@@ -17,6 +17,7 @@ package dao
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 
 	beegorm "github.com/beego/beego/v2/client/orm"
@@ -58,7 +59,22 @@ func (d *dao) UpdateUsername(ctx context.Context, username string, usernameRepla
 	if err != nil {
 		return err
 	}
-	_, err = o.Raw("UPDATE audit_log_ext SET username = ? WHERE username = ?", usernameReplace, username).Exec()
+	// op_desc names the user too: as the actor opening the sentence, and quoted
+	// wherever the user is the resource. One statement, so a row is never left
+	// half masked.
+	quoted, quotedReplace := strconv.Quote(username), strconv.Quote(usernameReplace)
+	_, err = o.Raw(`UPDATE audit_log_ext SET
+		op_desc = replace(
+			CASE WHEN username = ? AND left(op_desc, length(?) + 1) = ? || ' '
+				THEN ? || substr(op_desc, length(?) + 1)
+				ELSE op_desc END,
+			?, ?),
+		username = CASE WHEN username = ? THEN ? ELSE username END
+		WHERE username = ? OR position(? in op_desc) > 0`,
+		username, username, username, usernameReplace, username,
+		quoted, quotedReplace,
+		username, usernameReplace,
+		username, quoted).Exec()
 	return err
 }
 

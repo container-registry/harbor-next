@@ -22,9 +22,11 @@ import (
 
 	beegoorm "github.com/beego/beego/v2/client/orm"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/pkg/member/models"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
 )
@@ -33,7 +35,18 @@ const deadlockTimeout = 10 * time.Second
 
 func stubLookups() func() {
 	origLookup := lookupMemberFn
+	origGet := getMemberFn
 	origProject := resolveProjectFn
+	getMemberFn = func(_ context.Context, _, memberID string) *models.Member {
+		switch memberID {
+		case "10":
+			return &models.Member{ID: 10, ProjectID: 1, Entityname: "developers", EntityType: "g", Role: common.RoleDeveloper}
+		case "20":
+			return &models.Member{ID: 20, ProjectID: 1, Entityname: "testuser", EntityType: "u", Role: common.RoleProjectAdmin}
+		default:
+			return nil
+		}
+	}
 	lookupMemberFn = func(_ context.Context, _, memberID string) (string, string) {
 		switch memberID {
 		case "10":
@@ -52,6 +65,7 @@ func stubLookups() func() {
 	}
 	return func() {
 		lookupMemberFn = origLookup
+		getMemberFn = origGet
 		resolveProjectFn = origProject
 	}
 }
@@ -166,7 +180,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "create",
 			wantResource:   "developers",
-			wantDesc:       "create group member developers in project myproject",
+			wantDesc:       `admin created member "developers" in project "myproject": type "group", id 10, role "developer"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -181,7 +195,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "create",
 			wantResource:   "testuser",
-			wantDesc:       "create user member testuser in project myproject",
+			wantDesc:       `admin created member "testuser" in project "myproject": type "user", id 20, role "projectAdmin"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -210,7 +224,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "create",
 			wantResource:   "999",
-			wantDesc:       "create member 999 in project myproject",
+			wantDesc:       `admin created member "999" in project "myproject"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -225,7 +239,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "create",
 			wantResource:   "",
-			wantDesc:       "create member in project myproject",
+			wantDesc:       `admin created member in project "myproject"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -240,7 +254,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "delete",
 			wantResource:   "developers",
-			wantDesc:       "delete group member developers from project myproject",
+			wantDesc:       `admin deleted member "developers" in project "myproject": type "group"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -255,6 +269,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "delete",
 			wantResource:   "testuser",
+			wantDesc:       `admin deleted member "testuser" in project "myproject": type "user" (failed: 403 forbidden)`,
 			wantSuccessful: false,
 			wantProjectID:  1,
 		},
@@ -268,7 +283,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "update",
 			wantResource:   "developers",
-			wantDesc:       "update group member developers in project myproject",
+			wantDesc:       `admin updated member "developers" in project "myproject": type "group", role "developer"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -282,7 +297,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "update",
 			wantResource:   "999",
-			wantDesc:       "update member 999 in project myproject",
+			wantDesc:       `admin updated member "999" in project "myproject"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},
@@ -296,7 +311,153 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "update",
 			wantResource:   "10",
-			wantDesc:       "update member 10 in project myproject",
+			wantDesc:       `admin updated member "10" in project "myproject" (failed: 403 forbidden)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "update role with snapshot",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members/10",
+				RequestMethod:  http.MethodPut,
+				RequestPayload: `{"role_id":2}`,
+				ResponseCode:   http.StatusOK,
+				Before:         &models.Member{ID: 10, Entityname: "developers", EntityType: "g", Role: common.RoleGuest},
+			},
+			wantOperation:  "update",
+			wantResource:   "developers",
+			wantDesc:       `admin updated member "developers" in project "myproject": type "group", role "guest" -> "developer"`,
+			wantSuccessful: true,
+			wantProjectID:  1,
+		},
+		{
+			name: "update role rejected keeps the attempted change",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members/10",
+				RequestMethod:  http.MethodPut,
+				RequestPayload: `{"role_id":1}`,
+				ResponseCode:   http.StatusForbidden,
+				ResponseBody:   `{"errors":[{"code":"FORBIDDEN","message":"only project admin can change roles"}]}`,
+				Before:         &models.Member{ID: 10, Entityname: "developers", EntityType: "g", Role: common.RoleDeveloper},
+			},
+			wantOperation:  "update",
+			wantResource:   "developers",
+			wantDesc:       `admin updated member "developers" in project "myproject": type "group", role "developer" -> "projectAdmin" (failed: 403 only project admin can change roles)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "update with an empty body diffs no role",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members/10",
+				RequestMethod:  http.MethodPut,
+				RequestPayload: `{}`,
+				ResponseCode:   http.StatusBadRequest,
+				ResponseBody:   `{"errors":[{"code":"BAD_REQUEST","message":"role_id is required"}]}`,
+				Before:         &models.Member{ID: 10, Entityname: "developers", EntityType: "g", Role: common.RoleDeveloper},
+			},
+			wantOperation:  "update",
+			wantResource:   "developers",
+			wantDesc:       `admin updated member "developers" in project "myproject": type "group" (failed: 400 role_id is required)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "update with an unreadable body diffs no role",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members/10",
+				RequestMethod:  http.MethodPut,
+				RequestPayload: `{"role_id":`,
+				ResponseCode:   http.StatusBadRequest,
+				ResponseBody:   `{"errors":[{"code":"BAD_REQUEST","message":"invalid json"}]}`,
+				Before:         &models.Member{ID: 10, Entityname: "developers", EntityType: "g", Role: common.RoleDeveloper},
+			},
+			wantOperation:  "update",
+			wantResource:   "developers",
+			wantDesc:       `admin updated member "developers" in project "myproject": type "group" (failed: 400 invalid json)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "create by user id rejected still names the member",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members",
+				RequestMethod:  http.MethodPost,
+				RequestPayload: `{"role_id":2,"member_user":{"user_id":12}}`,
+				ResponseCode:   http.StatusNotFound,
+				ResponseBody:   `{"errors":[{"code":"NOT_FOUND","message":"user 12 not found"}]}`,
+			},
+			wantOperation:  "create",
+			wantResource:   "12",
+			wantDesc:       `admin created member "12" in project "myproject": type "user", role "developer" (failed: 404 user 12 not found)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "create by group id rejected still names the member",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members",
+				RequestMethod:  http.MethodPost,
+				RequestPayload: `{"role_id":3,"member_group":{"id":4}}`,
+				ResponseCode:   http.StatusNotFound,
+				ResponseBody:   `{"errors":[{"code":"NOT_FOUND","message":"group 4 not found"}]}`,
+			},
+			wantOperation:  "create",
+			wantResource:   "4",
+			wantDesc:       `admin created member "4" in project "myproject": type "group", role "guest" (failed: 404 group 4 not found)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "create by ldap group dn rejected still names the member",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members",
+				RequestMethod:  http.MethodPost,
+				RequestPayload: `{"role_id":3,"member_group":{"ldap_group_dn":"cn=devs,ou=groups,dc=example,dc=org"}}`,
+				ResponseCode:   http.StatusBadRequest,
+				ResponseBody:   `{"errors":[{"code":"BAD_REQUEST","message":"ldap group not found"}]}`,
+			},
+			wantOperation:  "create",
+			wantResource:   "cn=devs,ou=groups,dc=example,dc=org",
+			wantDesc:       `admin created member "cn=devs,ou=groups,dc=example,dc=org" in project "myproject": type "group", role "guest" (failed: 400 ldap group not found)`,
+			wantSuccessful: false,
+			wantProjectID:  1,
+		},
+		{
+			name: "delete with snapshot",
+			metadata: &commonevent.Metadata{
+				Username:      "admin",
+				RequestURL:    "/api/v2.0/projects/1/members/20",
+				RequestMethod: http.MethodDelete,
+				ResponseCode:  http.StatusOK,
+				ResourceName:  "u:testuser",
+				Before:        &models.Member{ID: 20, Entityname: "testuser", EntityType: "u", Role: common.RoleProjectAdmin},
+			},
+			wantOperation:  "delete",
+			wantResource:   "testuser",
+			wantDesc:       `admin deleted member "testuser" in project "myproject": type "user", id 20, role "projectAdmin"`,
+			wantSuccessful: true,
+			wantProjectID:  1,
+		},
+		{
+			name: "create rejected names the requested user",
+			metadata: &commonevent.Metadata{
+				Username:       "admin",
+				RequestURL:     "/api/v2.0/projects/1/members",
+				RequestMethod:  http.MethodPost,
+				RequestPayload: `{"role_id":2,"member_user":{"username":"alice"}}`,
+				ResponseCode:   http.StatusConflict,
+			},
+			wantOperation:  "create",
+			wantResource:   "alice",
+			wantDesc:       `admin created member "alice" in project "myproject": type "user", role "developer" (failed: 409 conflict)`,
 			wantSuccessful: false,
 			wantProjectID:  1,
 		},
@@ -327,7 +488,7 @@ func TestResolver_Resolve(t *testing.T) {
 			},
 			wantOperation:  "delete",
 			wantResource:   "raw-member-name",
-			wantDesc:       "delete member raw-member-name from project myproject",
+			wantDesc:       `admin deleted member "raw-member-name" in project "myproject"`,
 			wantSuccessful: true,
 			wantProjectID:  1,
 		},

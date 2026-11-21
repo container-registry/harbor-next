@@ -16,8 +16,10 @@ package login
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
@@ -46,7 +48,7 @@ func Test_login_Resolve(t *testing.T) {
 				RequestMethod: "POST",
 				Payload:       "principal=test&password=123456",
 				ResponseCode:  200,
-			}, event: &event.Event{}}, false, "test", "login", "login", true},
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth"`, true},
 		{"test fail", &loginResolver{}, args{
 			ce: &commonevent.Metadata{
 				Username:      "test",
@@ -54,10 +56,35 @@ func Test_login_Resolve(t *testing.T) {
 				RequestMethod: "POST",
 				Payload:       "principal=test&password=123456",
 				ResponseCode:  401,
-			}, event: &event.Event{}}, false, "test", "login", "login", false},
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth" (failed: 401 unauthorized)`, false},
+		{"test fail with reason", &loginResolver{}, args{
+			ce: &commonevent.Metadata{
+				Username:       "test",
+				RequestURL:     "/c/login",
+				RequestMethod:  "POST",
+				RequestPayload: "principal=test&password=123456",
+				ResponseCode:   401,
+				ResponseBody:   `{"errors":[{"code":"UNAUTHORIZED","message":"invalid credentials"}]}`,
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth" (failed: 401 invalid credentials)`, false},
+		{"test oidc callback", &loginResolver{}, args{
+			ce: &commonevent.Metadata{
+				Username:      "alice",
+				RequestURL:    "/c/oidc/callback?code=x",
+				RequestMethod: "GET",
+				ResponseCode:  302,
+			}, event: &event.Event{}}, false, "alice", "login", `alice logged in: auth_mode "oidc_auth"`, true},
 	}
+	origAuthMode := authModeFn
+	defer func() { authModeFn = origAuthMode }()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// the OIDC callback only exists under oidc_auth
+			authModeFn = func(_ context.Context) string {
+				if strings.HasPrefix(tt.args.ce.RequestURL, "/c/oidc/") {
+					return common.OIDCAuth
+				}
+				return "db_auth"
+			}
 			l := &loginResolver{}
 			if err := l.Resolve(tt.args.ce, tt.args.event); (err != nil) != tt.wantErr {
 				t.Errorf("resolver.Resolve() error = %v, wantErr %v", err, tt.wantErr)

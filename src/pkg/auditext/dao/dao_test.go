@@ -193,3 +193,43 @@ func TestPermitEventTypes(t *testing.T) {
 		t.Errorf("permitOtherEventTypes failed, it should include all event types")
 	}
 }
+
+func (d *daoTestSuite) TestUpdateUsernameMasksDescriptions() {
+	actor, err := d.dao.Create(d.ctx, &model.AuditLogExt{
+		Operation: "update", ResourceType: "user", Resource: "alice", Username: "alice",
+		OperationDescription: `alice updated user "alice": email "a@x" -> "b@x"`, IsSuccessful: true, OpTime: time.Now(),
+	})
+	d.Require().Nil(err)
+	target, err := d.dao.Create(d.ctx, &model.AuditLogExt{
+		Operation: "delete", ResourceType: "user", Resource: "alice", Username: "admin",
+		OperationDescription: `admin deleted user "alice": id 7`, IsSuccessful: true, OpTime: time.Now(),
+	})
+	d.Require().Nil(err)
+	// "alice" as a substring of another word or name must survive
+	bystander, err := d.dao.Create(d.ctx, &model.AuditLogExt{
+		Operation: "delete", ResourceType: "user", Resource: "malice", Username: "admin",
+		OperationDescription: `admin deleted user "malice": id 8`, IsSuccessful: true, OpTime: time.Now(),
+	})
+	d.Require().Nil(err)
+	defer func() {
+		for _, id := range []int64{actor, target, bystander} {
+			_ = d.dao.Delete(d.ctx, id)
+		}
+	}()
+
+	d.Require().Nil(d.dao.UpdateUsername(d.ctx, "alice", "masked"))
+
+	row, err := d.dao.Get(d.ctx, actor)
+	d.Require().Nil(err)
+	d.Equal("masked", row.Username)
+	d.Equal(`masked updated user "masked": email "a@x" -> "b@x"`, row.OperationDescription)
+
+	row, err = d.dao.Get(d.ctx, target)
+	d.Require().Nil(err)
+	d.Equal("admin", row.Username)
+	d.Equal(`admin deleted user "masked": id 7`, row.OperationDescription)
+
+	row, err = d.dao.Get(d.ctx, bystander)
+	d.Require().Nil(err)
+	d.Equal(`admin deleted user "malice": id 8`, row.OperationDescription)
+}
