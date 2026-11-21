@@ -238,6 +238,24 @@ tests:
           path: data.JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT
           value: "10"
 
+  # Pins: precedence chart default < global.env < jobservice.env, one key each.
+  - it: should merge global.env and jobservice.env over chart env
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      global.env.HARBOR_WEBHOOK_EGRESS_POLICY: public_only
+      global.env.LOG_LEVEL: warning
+      jobservice.env.LOG_LEVEL: debug
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
+      - equal:
+          path: data.LOG_LEVEL
+          value: debug
+
   # Pins PVC gating: rendered when persistence.enabled=true, size flows to storage request
   - it: should render PVC with requested storage when persistence enabled
     template: templates/jobservice.pvc.yaml

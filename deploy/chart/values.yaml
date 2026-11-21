@@ -3,7 +3,9 @@
 # ============================================================================
 # This chart uses the `toEnvVars` pattern for configuration.
 # Any Harbor config option can be set via component config/secret sections
-# without requiring chart updates.
+# without requiring chart updates. Env precedence, lowest first: chart
+# defaults, `global.env`, `<component>.config` (`jobservice.env`),
+# `<component>.secret`, `<component>.extraEnv`.
 # ============================================================================
 
 # ============================================================================
@@ -23,6 +25,13 @@ global:
   # to subcharts; the valkey subchart image must be mirrored/overridden separately
   # (it may not honor this).
   imageRegistry: ""
+  # -- Env vars for core and jobservice, for Harbor settings both read. Flattened
+  # like `core.config`; overrides chart defaults, and `core.config` /
+  # `jobservice.env` override it. A key the chart renders from a typed value
+  # (`network.webhookEgress.policy` -> `HARBOR_WEBHOOK_EGRESS_POLICY`) is
+  # overridden too, but skips that value's schema validation: prefer the typed value.
+  # @default -- {}
+  env: {}
 
 # -- Annotations to add to all resources this chart deploys. `checksum/*` keys are
 # reserved by the chart (used for config/secret-driven pod rollout) — setting one
@@ -347,7 +356,9 @@ core:
   # -- Initial user settings JSON applied on first boot
   configureUserSettings: ""
 
-  # -- Project that receives pushes and pulls without a project in the path
+  # -- DEPRECATED: use `core.config.DEFAULT_PROJECT_NAME`. DEFAULT_PROJECT_NAME in
+  # `global.env`, `core.config`, `core.secret` or `core.extraEnv` wins over this value.
+  # Project that receives pushes and pulls without a project in the path
   # (DEFAULT_PROJECT_NAME). Applied on every start and locked in the UI; a missing
   # project is created as private. "" turns the fallback off; null leaves it to the UI.
   defaultProjectName: null

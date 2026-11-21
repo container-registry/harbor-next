@@ -75,9 +75,9 @@ tests:
           path: data.DEFAULT_PROJECT_NAME
           value: ""
 
-  # Pins: core.defaultProjectName and a DEFAULT_PROJECT_NAME in core.config cannot both render.
-  - it: should fail when core.config also sets DEFAULT_PROJECT_NAME
-    template: templates/core.deployment.yaml
+  # Pins: core.config wins over the deprecated typed value instead of failing.
+  - it: should let core.config DEFAULT_PROJECT_NAME win over core.defaultProjectName
+    template: templates/core.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -85,36 +85,72 @@ tests:
       core.defaultProjectName: catchall
       core.config.default_project_name: other
     asserts:
-      - failedTemplate:
-          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
-
-  # Pins: core.defaultProjectName and a DEFAULT_PROJECT_NAME in core.extraEnv cannot both render.
-  - it: should fail when core.extraEnv also sets DEFAULT_PROJECT_NAME
-    template: templates/core.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      core.defaultProjectName: catchall
-      core.extraEnv:
-        - name: DEFAULT_PROJECT_NAME
+      - equal:
+          path: data.DEFAULT_PROJECT_NAME
           value: other
-    asserts:
-      - failedTemplate:
-          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
 
-  # Pins: a DEFAULT_PROJECT_NAME in core.secret conflicts too, whatever the key case.
-  - it: should fail when core.secret also sets DEFAULT_PROJECT_NAME
+  # Pins: core.config overrides a chart-managed default for the same env key.
+  - it: should let core.config override a chart-managed core env key
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.config.REPLICATION_ADAPTER_WHITELIST: harbor,docker-hub
+    asserts:
+      - equal:
+          path: data.REPLICATION_ADAPTER_WHITELIST
+          value: harbor,docker-hub
+
+  # Pins: precedence chart default < global.env < core.config.
+  - it: should apply global.env to core below core.config
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      global.env.HARBOR_WEBHOOK_EGRESS_POLICY: public_only
+      global.env.LOG_LEVEL: warning
+      core.config.LOG_LEVEL: debug
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
+      - equal:
+          path: data.LOG_LEVEL
+          value: debug
+
+  # Pins: toEnvVars uppercases keys, so two spellings of one key must fail, not collapse.
+  - it: should fail when one block sets the same env key twice
     template: templates/core.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      core.defaultProjectName: catchall
-      core.secret.default_project_name: other
+      core.config.log_level: debug
+      core.config.LOG_LEVEL: info
     asserts:
       - failedTemplate:
-          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
+          errorMessage: env key LOG_LEVEL is set twice in one block; keys are uppercased, so log_level and LOG_LEVEL collide
+
+  # Pins: app.conf is a mounted file, not env, and keeps its exact body.
+  - it: should keep app.conf unchanged next to merged env
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.config.LOG_LEVEL: debug
+    asserts:
+      - equal:
+          path: data["app.conf"]
+          value: |
+            appname = Harbor
+            runmode = prod
+            enablegzip = true
+
+            [prod]
+            httpport = 8080
 
   # Pins: DEFAULT_PROJECT_NAME from core.config alone still renders.
   - it: should keep DEFAULT_PROJECT_NAME from core.config when core.defaultProjectName is unset

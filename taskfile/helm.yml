@@ -87,6 +87,9 @@ tasks:
       #    declared — this catches what it cannot see. Baseline file:
       #    {{.CHART_DIR}}/.schema-drift-allow.
       - cmd: cd {{.CHART_DIR}} && ys tools/schema-drift.ys values.yaml values.schema.json strict
+      # 3. New values.yaml paths must be added to .values-keys on purpose:
+      #    Harbor settings go through the passthrough, not typed values.
+      - cmd: cd {{.CHART_DIR}} && ys tools/typed-values-gate.ys values.yaml .values-keys
 
   values-lint:
     desc: "Run the values doctor (tools/values-lint.ys) over every example and CI values file"
