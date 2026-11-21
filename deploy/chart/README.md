@@ -1030,7 +1030,7 @@ Kubernetes: `>=1.28.0-0`
 | postgresql.enabled | bool | `false` | Deploy PostgreSQL in-cluster and point Harbor at it (`database.*` is then ignored). Any cloudpirates/postgres value can be set here. See docs/postgresql.md. |
 | postgresql.fullnameOverride | string | `"postgresql"` |  |
 | postgresql.image.tag | string | `"19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60"` | PostgreSQL image tag. The data lives in `<major>/docker` on the volume. |
-| postgresql.initContainers | list | data guard, see values.yaml | Refuses to start when the volume holds data of an older major, which PostgreSQL 19 would otherwise skip and start empty. pgautoupgrade has no 19 image yet, so the upgrade is manual. See docs/postgresql.md. |
+| postgresql.initContainers | list | pg_upgrade from 18, see values.yaml | Upgrades PostgreSQL 18 data in `18/docker` to 19 with pg_upgrade in link mode before PostgreSQL starts, and refuses older majors and layouts, which PostgreSQL 19 would otherwise skip and start empty. See docs/postgresql.md. |
 | proxy.components[0] | string | `"core"` |  |
 | proxy.components[1] | string | `"jobservice"` |  |
 | proxy.components[2] | string | `"trivy"` |  |

@@ -29,60 +29,53 @@ values file (`helm upgrade -f values.yaml`) or use `--reset-then-reuse-values`
 ## Major upgrades
 
 The chart runs PostgreSQL 19, with the data in `19/docker` on the volume. An
-init container, `pgdata-guard`, checks the volume before PostgreSQL starts. It
-passes when the volume is empty or already holds PostgreSQL 19 data. When it
-finds data of an older major (`18/docker`, or `pgdata` and `pgdata/pgNN` from
-older layouts), it logs where and exits with an error, and the pod stays in
-`Init`. Without the guard, PostgreSQL 19 would start an empty database next to
-data in the `pgdata` layouts.
+init container, `pgdata-upgrade`, checks the volume before PostgreSQL starts:
 
-Charts up to 2.16 ran [pgautoupgrade](https://github.com/pgautoupgrade/docker-pgautoupgrade)
-there instead, which upgraded older data in place. pgautoupgrade has no
-PostgreSQL 19 image yet, so the upgrade from PostgreSQL 18 is a dump and
-restore. Take it before you upgrade the chart; the release is called `harbor`
-in namespace `harbor` here:
+- Empty, or already `19/docker`: nothing to do.
+- `18/docker` (charts up to 2.16): it runs `pg_upgrade --link` from the
+  [tianon/postgres-upgrade](https://github.com/tianon/docker-postgres-upgrade)
+  `18-to-19` image, which carries both versions' binaries. The new cluster
+  keeps the old superuser, encoding, locale and data checksum setting, and
+  takes over `pg_hba.conf`, `pg_ident.conf` and `postgresql.auto.conf`. It is
+  built in `19/upgrade` and renamed to `19/docker` only when everything
+  succeeded, so a pod restart in the middle starts the upgrade over. Link mode
+  hard-links the data files, so it needs little extra space and is fast on
+  large databases.
+- Anything older (`NN/docker`, or `pgdata` and `pgdata/pgNN` from older
+  layouts): it logs where it found the data and exits with an error, and the
+  pod stays in `Init`. Without that check PostgreSQL 19 would start an empty
+  database next to data in the `pgdata` layouts. Upgrade those with the 2.16
+  chart first, which brings them to PostgreSQL 18 in `18/docker`.
+
+Take a dump before you upgrade the chart. Once PostgreSQL 19 has started on
+the linked files, the PostgreSQL 18 copy can no longer be started, and the
+dump is the only way back. Stop Harbor's writers first, so nothing is written
+after the dump. `helm upgrade` starts them again, and they wait for the
+database until the upgrade is done. The release is called `harbor` in
+namespace `harbor` here:
 
 ```sh
-stop_writers() {
-  kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=0 &&
-  kubectl -n harbor wait --for=delete pod --timeout=5m \
-    -l 'app.kubernetes.io/instance=harbor,app.kubernetes.io/component in (core,jobservice)'
-}
-
-# 1. With the old chart: stop Harbor's writers, dump, check the dump
-stop_writers
+kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=0
+kubectl -n harbor wait --for=delete pod --timeout=5m \
+  -l 'app.kubernetes.io/instance=harbor,app.kubernetes.io/component in (core,jobservice)'
 kubectl -n harbor exec postgresql-0 -c postgresql -- \
   sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d "$POSTGRES_DB"' > harbor.sql
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
-
-# 2. Upgrade the chart; the PostgreSQL pod stops in Init at the guard.
-#    The upgrade starts core again, and core would migrate the new empty
-#    database before the restore, so stop the writers once more.
 helm upgrade harbor <chart> -n harbor -f values.yaml
-stop_writers
-
-# 3. Only after "dump OK": replace the volume with an empty one
-kubectl -n harbor delete pvc data-postgresql-0 --wait=false
-kubectl -n harbor delete pod postgresql-0
-
-# 4. Restore, and start Harbor only when the restore succeeded
-kubectl -n harbor wait --for=condition=Ready pod/postgresql-0 --timeout=5m &&
-kubectl -n harbor exec -i postgresql-0 -c postgresql -- \
-  sh -c 'psql -v ON_ERROR_STOP=1 -q -U "${POSTGRES_USER:-postgres}" -d "$POSTGRES_DB"' < harbor.sql > /dev/null &&
-echo "restore OK" &&
-kubectl -n harbor scale deploy harbor-core harbor-jobservice --replicas=1
+kubectl -n harbor logs postgresql-0 -c pgdata-upgrade
 ```
 
-Keep `harbor.sql` and the chart's `secretKey` together until the upgraded
-Harbor works. Step 3 deletes the old data, so do not run it without `dump OK`.
-If step 4 does not print `restore OK`, repeat steps 3 and 4. Set the replicas
-in step 4 to your values; with an HPA, `helm upgrade` restores them.
+The last log line starts with `upgraded 18/docker to 19/docker`. When Harbor works, remove
+the old directory, which still holds the PostgreSQL 18 catalog:
 
-Step 3 assumes the claim the subchart creates, `data-postgresql-0`
-(`<persistence.volumeName>-postgresql-0` if you renamed the volume). With
-`postgresql.persistence.existingClaim`, the chart does not create the claim:
-point `existingClaim` at a new, empty claim instead, and keep the old one
-until the upgrade works.
+```sh
+kubectl -n harbor exec postgresql-0 -c postgresql -- rm -rf /var/lib/postgresql/18
+```
+
+Changes made directly in the old `postgresql.conf` are not carried over;
+settings passed by the subchart or set with `ALTER SYSTEM` are. Keep
+`harbor.sql` and the chart's `secretKey` together until the upgraded Harbor
+works.
 
 To stay on PostgreSQL 18 instead, pin `postgresql.image.tag` to an 18 tag and
 set `postgresql.initContainers` to the pgautoupgrade 18 init container from the
@@ -91,7 +84,7 @@ set `postgresql.initContainers` to the pgautoupgrade 18 init container from the
 
 If you set `postgresql.persistence.subPath` or `volumeName`, give the init
 container's data mount the same values. The chart refuses to render otherwise,
-since the guard would miss the old data and PostgreSQL would start empty.
+since the init container would miss the old data and PostgreSQL would start empty.
 
 ## Moving from goharbor/harbor-helm with the internal database
 
@@ -102,8 +95,9 @@ chart for this move: its init container moves the old data directory to
 `18/docker` and upgrades it to PostgreSQL 18 when it is older. The old image
 used another glibc, so on the first start it also runs `reindexdb --all` and
 `ALTER DATABASE ... REFRESH COLLATION VERSION`. Later starts find nothing to
-do. Then go to PostgreSQL 19 as described in [Major upgrades](#major-upgrades).
-This chart's guard refuses the old directory and does not move it.
+do. Then upgrade to this chart, which takes `18/docker` to PostgreSQL 19 as
+described in [Major upgrades](#major-upgrades). This chart refuses the old
+directory and does not move it.
 
 | Harbor | harbor-helm | PostgreSQL | Data directory on the PVC |
 |---|---|---|---|
