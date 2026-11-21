@@ -6,6 +6,22 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.17.0-beta](https://github.com/container-registry/8gcr/compare/v2.16.0...v2.17.0-beta) (2026-11-21)
+
+
+### Features
+
+* Use PostgreSQL 19 ([#1534](https://github.com/container-registry/8gcr/issues/1534)) ([d8118e1](https://github.com/container-registry/8gcr/commit/d8118e1a245c6e617d7239e37f760a1c58280ee4))
+
+
+### Bug Fixes
+
+* **network:** Remove HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS ([#1537](https://github.com/container-registry/8gcr/issues/1537)) ([56b1023](https://github.com/container-registry/8gcr/commit/56b102314398064f11679b02a61f679bc164fb41))
+* **portal:** Guide First Push From The Empty Repository List ([#1492](https://github.com/container-registry/8gcr/issues/1492)) ([2b8f98e](https://github.com/container-registry/8gcr/commit/2b8f98ea10b7981520ca0502374cadc01687542d))
+* **portal:** Show Proxy Cache Settings Only To System Admins ([#1501](https://github.com/container-registry/8gcr/issues/1501)) ([6b06dc9](https://github.com/container-registry/8gcr/commit/6b06dc92235df3e556e76aa5fc33f7380bdc76f5))
+* **portal:** Show Push Commands In A Dialog With Format Tabs ([#1491](https://github.com/container-registry/8gcr/issues/1491)) ([fc07c36](https://github.com/container-registry/8gcr/commit/fc07c36b4192f8ad6af44df1d6295742916a2ab9))
+* **portal:** Stop Listing Registries For Project Admins On Project Configuration ([#1489](https://github.com/container-registry/8gcr/issues/1489)) ([a7b5ebc](https://github.com/container-registry/8gcr/commit/a7b5ebcc405382666af47caebc505f1782592e20))
+
 ## [2.16.0](https://github.com/container-registry/harbor-next/compare/v2.15.0...v2.16.0) (2026-11-17)
 
 
