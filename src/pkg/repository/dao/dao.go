@@ -159,15 +159,11 @@ func (d *dao) Touch(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	num, err := ormer.QueryTable(new(model.RepoRecord)).Filter("RepositoryID", id).Update(
-		o.Params{"update_time": time.Now()})
-	if err != nil {
-		return err
-	}
-	if num == 0 {
-		return errors.NotFoundError(nil).WithMessagef("repository %d not found", id)
-	}
-	return nil
+	// best effort: waiting on a row another writer holds deadlocks against pushes holding quota_usage
+	_, err = ormer.Raw(`UPDATE repository SET update_time = ? WHERE repository_id IN
+		(SELECT repository_id FROM repository WHERE repository_id = ? FOR NO KEY UPDATE SKIP LOCKED)`,
+		time.Now(), id).Exec()
+	return err
 }
 
 func (d *dao) NonEmptyRepos(ctx context.Context) ([]*model.RepoRecord, error) {

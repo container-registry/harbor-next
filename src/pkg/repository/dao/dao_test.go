@@ -194,6 +194,34 @@ func (d *daoTestSuite) TestAddPullCount() {
 	d.dao.Delete(d.ctx, id)
 }
 
+func (d *daoTestSuite) TestTouch() {
+	before, err := d.dao.Get(d.ctx, d.id)
+	d.Require().NoError(err)
+	time.Sleep(10 * time.Millisecond)
+	d.Require().NoError(d.dao.Touch(d.ctx, d.id))
+	after, err := d.dao.Get(d.ctx, d.id)
+	d.Require().NoError(err)
+	d.True(after.UpdateTime.After(before.UpdateTime))
+}
+
+func (d *daoTestSuite) TestTouchSkipsLockedRow() {
+	holder := beegoorm.NewOrm()
+	tx, err := holder.Begin()
+	d.Require().NoError(err)
+	defer tx.Rollback()
+	_, err = tx.Raw("SELECT repository_id FROM repository WHERE repository_id = ? FOR UPDATE", d.id).Exec()
+	d.Require().NoError(err)
+
+	done := make(chan error, 1)
+	go func() { done <- d.dao.Touch(orm.NewContext(nil, beegoorm.NewOrm()), d.id) }()
+	select {
+	case err := <-done:
+		d.NoError(err)
+	case <-time.After(5 * time.Second):
+		d.Fail("Touch blocked on a repository row locked by another transaction")
+	}
+}
+
 func (d *daoTestSuite) TestNonEmptyRepos() {
 	repository := &model.RepoRecord{
 		Name:        "TestNonEmptyRepos",
