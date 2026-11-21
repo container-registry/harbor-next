@@ -461,6 +461,12 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-1', 'https://shared.example.com', 1)",
 		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-2', 'https://shared.example.com', 2)",
 		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'shared' FROM identity_providers WHERE name LIKE 'shared-%'",
+		// a same-URL sibling that is ineligible (multiple aud values) does not disqualify an eligible sibling (#1282)
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('sibling-eligible', 'https://sibling.example.com', 1)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'alpha' FROM identity_providers WHERE name = 'sibling-eligible'",
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('sibling-ineligible', 'https://sibling.example.com', 2)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'alpha' FROM identity_providers WHERE name = 'sibling-ineligible'",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'beta' FROM identity_providers WHERE name = 'sibling-ineligible'",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -518,12 +524,14 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 		// rows written before the column existed take their single issuer-level aud
 		// claim as the audience and otherwise keep the empty default
 		for name, want := range map[string]string{
-			"legacy":    "",
-			"aud-claim": "harbor",
-			"two-auds":  "",
-			"robot-aud": "",
-			"shared-1":  "",
-			"shared-2":  "",
+			"legacy":             "",
+			"aud-claim":          "harbor",
+			"two-auds":           "",
+			"robot-aud":          "",
+			"shared-1":           "",
+			"shared-2":           "",
+			"sibling-eligible":   "alpha",
+			"sibling-ineligible": "",
 		} {
 			var audience string
 			if err := schemaPool.DB().QueryRowContext(ctx,
@@ -537,11 +545,13 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 
 		// claims are left as they were
 		for name, want := range map[string]string{
-			"aud-claim": "aud,sub",
-			"two-auds":  "aud,aud",
-			"robot-aud": "aud",
-			"shared-1":  "aud",
-			"shared-2":  "aud",
+			"aud-claim":          "aud,sub",
+			"two-auds":           "aud,aud",
+			"robot-aud":          "aud",
+			"shared-1":           "aud",
+			"shared-2":           "aud",
+			"sibling-eligible":   "aud",
+			"sibling-ineligible": "aud,aud",
 		} {
 			var paths string
 			if err := schemaPool.DB().QueryRowContext(ctx, `
