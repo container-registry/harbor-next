@@ -18,8 +18,10 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/manifest/schema2"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -252,4 +254,63 @@ func TestGetRef(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (p *proxyControllerTestSuite) proxyManifestOf(dig string) lib.ArtifactInfo {
+	man := &mockManifest{}
+	man.On("Payload").Return(schema2.MediaTypeManifest, []byte("{}"), nil)
+	p.remote.On("Manifest", mock.Anything, mock.Anything).Return(man, dig, nil)
+	return lib.ArtifactInfo{ProjectName: "proxy", Repository: "proxy/app", Tag: "v1"}
+}
+
+func fillRunning(key string) (int, bool) {
+	fills.Lock()
+	defer fills.Unlock()
+	events, ok := fills.m[key]
+	return len(events), ok
+}
+
+func (p *proxyControllerTestSuite) TestProxyManifestParksDuplicateOnRunningFill() {
+	dig := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	art := p.proxyManifestOf(dig)
+	key := "manifest-fill:proxy/app:v1@" + dig
+	p.Require().True(startFill(key, pullEvent{}))
+	defer endFill(key)
+
+	_, err := p.ctr.ProxyManifest(context.Background(), art, p.remote)
+	p.Require().NoError(err)
+
+	parked, running := fillRunning(key)
+	p.True(running)
+	p.Equal(1, parked)
+	p.local.AssertNotCalled(p.T(), "GetManifest", mock.Anything, mock.Anything)
+}
+
+func (p *proxyControllerTestSuite) TestProxyManifestReleasesFillWhenLimitReached() {
+	saved := cacheFillSem
+	defer func() { cacheFillSem = saved }()
+	cacheFillSem = make(chan struct{}, 1)
+	cacheFillSem <- struct{}{}
+
+	dig := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	_, err := p.ctr.ProxyManifest(context.Background(), p.proxyManifestOf(dig), p.remote)
+	p.Require().NoError(err)
+
+	_, running := fillRunning("manifest-fill:proxy/app:v1@" + dig)
+	p.False(running, "a rejected owner must not leave its registration behind")
+}
+
+func (p *proxyControllerTestSuite) TestProxyManifestReleasesFillOnPanic() {
+	dig := "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+	key := "manifest-fill:proxy/app:v1@" + dig
+	// the fill panics before endFill: without a database the ORM copy in it fails
+	_, err := p.ctr.ProxyManifest(context.Background(), p.proxyManifestOf(dig), p.remote)
+	p.Require().NoError(err)
+
+	p.Eventually(func() bool {
+		_, running := fillRunning(key)
+		return !running
+	}, 2*time.Second, 10*time.Millisecond)
+	p.True(startFill(key, pullEvent{}), "the key is free for the next fill")
+	endFill(key)
 }

@@ -234,7 +234,19 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 	// proxy-cache concurrency limit so a slow/unresponsive backend cannot make
 	// these detached goroutines accumulate without bound.
 	op := operator.FromContext(ctx)
+	ip, ua := requestinfo.FromContext(ctx)
+	// one fill per manifest: each can wait minutes for its blobs, duplicates would take every slot
+	fillKey := "manifest-fill:" + art.Repository + ":" + ref + "@" + dig
+	if !startFill(fillKey, pullEvent{tag: art.Tag, op: op, ip: ip, ua: ua}) {
+		return man, nil
+	}
 	if !GoCacheFill("manifest:"+art.Repository, func() {
+		ended := false
+		defer func() {
+			if !ended {
+				endFill(fillKey)
+			}
+		}()
 		bCtx := orm.Copy(ctx)
 		a, err := c.local.GetManifest(bCtx, art)
 		if err != nil {
@@ -256,11 +268,16 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 				log.Errorf("failed to get manifest, error %v", err)
 			}
 		}
+		parked := endFill(fillKey)
+		ended = true
 		if a != nil {
-			ip, ua := requestinfo.FromContext(bCtx)
 			SendPullEvent(bCtx, a, art.Tag, op, ip, ua)
+			for _, e := range parked {
+				SendPullEvent(bCtx, a, e.tag, e.op, e.ip, e.ua)
+			}
 		}
 	}) {
+		parked := endFill(fillKey)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -268,10 +285,23 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 				}
 			}()
 			c.sendManifestPullEvent(orm.Copy(ctx), art, op)
+			if len(parked) > 0 {
+				c.sendParkedPullEvents(orm.Copy(ctx), art, parked)
+			}
 		}()
 	}
 
 	return man, nil
+}
+
+func (c *controller) sendParkedPullEvents(ctx context.Context, art lib.ArtifactInfo, events []pullEvent) {
+	a, err := c.local.GetManifest(ctx, art)
+	if err != nil || a == nil {
+		return
+	}
+	for _, e := range events {
+		SendPullEvent(ctx, a, e.tag, e.op, e.ip, e.ua)
+	}
 }
 
 func (c *controller) sendManifestPullEvent(ctx context.Context, art lib.ArtifactInfo, op string) {
