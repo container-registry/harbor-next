@@ -1,3 +1,52 @@
+{{- /* Chart defaults for trivy env. Explicit env beats envFrom, so a name the
+      user claims in trivy.config / trivy.secret is dropped here instead.
+      API address and Redis wiring stay pinned in the StatefulSet. */}}
+{{- define "harbor.trivy.chartEnv" -}}
+{{- if has "trivy" .Values.proxy.components }}
+- name: HTTP_PROXY
+  value: {{ .Values.proxy.httpProxy | default "" | quote }}
+- name: HTTPS_PROXY
+  value: {{ .Values.proxy.httpsProxy | default "" | quote }}
+- name: NO_PROXY
+  value: "{{ include "harbor.noProxy" . }}"
+{{- end }}
+- name: "SCANNER_LOG_LEVEL"
+  value: {{ .Values.logLevel | quote }}
+- name: "SCANNER_TRIVY_CACHE_DIR"
+  value: "/home/scanner/.cache/trivy"
+- name: "SCANNER_TRIVY_REPORTS_DIR"
+  value: "/home/scanner/.cache/reports"
+- name: "SCANNER_TRIVY_DEBUG_MODE"
+  value: {{ .Values.trivy.debugMode | quote }}
+- name: "SCANNER_TRIVY_VULN_TYPE"
+  value: {{ .Values.trivy.vulnType | quote }}
+- name: "SCANNER_TRIVY_TIMEOUT"
+  value: {{ .Values.trivy.timeout | quote }}
+- name: "SCANNER_TRIVY_GITHUB_TOKEN"
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "harbor.fullname" . }}-trivy
+      key: gitHubToken
+- name: "SCANNER_TRIVY_SEVERITY"
+  value: {{ .Values.trivy.severity | quote }}
+- name: "SCANNER_TRIVY_IGNORE_UNFIXED"
+  value: {{ .Values.trivy.ignoreUnfixed | default false | quote }}
+- name: "SCANNER_TRIVY_SKIP_UPDATE"
+  value: {{ .Values.trivy.skipUpdate | default false | quote }}
+- name: "SCANNER_TRIVY_SKIP_JAVA_DB_UPDATE"
+  value: {{ .Values.trivy.skipJavaDBUpdate | default false | quote }}
+- name: "SCANNER_TRIVY_DB_REPOSITORY"
+  value: {{ .Values.trivy.dbRepository | join "," | quote }}
+- name: "SCANNER_TRIVY_JAVA_DB_REPOSITORY"
+  value: {{ .Values.trivy.javaDBRepository | join "," | quote }}
+- name: "SCANNER_TRIVY_OFFLINE_SCAN"
+  value: {{ .Values.trivy.offlineScan | default false | quote }}
+- name: "SCANNER_TRIVY_SECURITY_CHECKS"
+  value: {{ .Values.trivy.securityCheck | quote }}
+- name: "SCANNER_TRIVY_INSECURE"
+  value: {{ .Values.trivy.insecure | default false | quote }}
+{{- end }}
+
 {{- if .Values.trivy.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
@@ -66,49 +115,16 @@ spec:
             {{- end }}
           {{- end }}
           env:
-          {{- if has "trivy" .Values.proxy.components }}
-            - name: HTTP_PROXY
-              value: "{{ .Values.proxy.httpProxy }}"
-            - name: HTTPS_PROXY
-              value: "{{ .Values.proxy.httpsProxy }}"
-            - name: NO_PROXY
-              value: "{{ include "harbor.noProxy" . }}"
-          {{- end }}
-            - name: "SCANNER_LOG_LEVEL"
-              value: {{ .Values.logLevel | quote }}
-            - name: "SCANNER_TRIVY_CACHE_DIR"
-              value: "/home/scanner/.cache/trivy"
-            - name: "SCANNER_TRIVY_REPORTS_DIR"
-              value: "/home/scanner/.cache/reports"
-            - name: "SCANNER_TRIVY_DEBUG_MODE"
-              value: {{ .Values.trivy.debugMode | quote }}
-            - name: "SCANNER_TRIVY_VULN_TYPE"
-              value: {{ .Values.trivy.vulnType | quote }}
-            - name: "SCANNER_TRIVY_TIMEOUT"
-              value: {{ .Values.trivy.timeout | quote }}
-            - name: "SCANNER_TRIVY_GITHUB_TOKEN"
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "harbor.fullname" . }}-trivy
-                  key: gitHubToken
-            - name: "SCANNER_TRIVY_SEVERITY"
-              value: {{ .Values.trivy.severity | quote }}
-            - name: "SCANNER_TRIVY_IGNORE_UNFIXED"
-              value: {{ .Values.trivy.ignoreUnfixed | default false | quote }}
-            - name: "SCANNER_TRIVY_SKIP_UPDATE"
-              value: {{ .Values.trivy.skipUpdate | default false | quote }}
-            - name: "SCANNER_TRIVY_SKIP_JAVA_DB_UPDATE"
-              value: {{ .Values.trivy.skipJavaDBUpdate | default false | quote }}
-            - name: "SCANNER_TRIVY_DB_REPOSITORY"
-              value: {{ .Values.trivy.dbRepository | join "," | quote }}
-            - name: "SCANNER_TRIVY_JAVA_DB_REPOSITORY"
-              value: {{ .Values.trivy.javaDBRepository | join "," | quote }}
-            - name: "SCANNER_TRIVY_OFFLINE_SCAN"
-              value: {{ .Values.trivy.offlineScan | default false | quote }}
-            - name: "SCANNER_TRIVY_SECURITY_CHECKS"
-              value: {{ .Values.trivy.securityCheck | quote }}
-            - name: "SCANNER_TRIVY_INSECURE"
-              value: {{ .Values.trivy.insecure | default false | quote }}
+            {{- $cfgEnv := include "harbor.toEnvVars" (dict "values" (.Values.trivy.config | default dict) "prefix" "" "isSecret" false) | fromYaml }}
+            {{- if hasKey $cfgEnv "SCANNER_TRIVY_GITHUB_TOKEN" }}
+            {{- fail "trivy.config must not set SCANNER_TRIVY_GITHUB_TOKEN: it would land in a ConfigMap. Use trivy.secret or trivy.gitHubToken." }}
+            {{- end }}
+            {{- $ovr := merge $cfgEnv (include "harbor.toEnvVars" (dict "values" (.Values.trivy.secret | default dict) "prefix" "" "isSecret" false) | fromYaml) }}
+            {{- range (include "harbor.trivy.chartEnv" . | fromYamlArray) }}
+            {{- if not (hasKey $ovr .name) }}
+{{ toYaml (list .) | indent 12 }}
+            {{- end }}
+            {{- end }}
             - name: SCANNER_API_SERVER_ADDR
               value: ":8080"
             {{- /* REDIS_PASSWORD must precede the URL envs: Kubernetes

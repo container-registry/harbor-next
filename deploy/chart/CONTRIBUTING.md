@@ -82,6 +82,26 @@ surface", but its shape follows what the process consumes:
 | registry, jobservice | a config file | the **verbatim config-file body** (YAML passthrough); `jobservice.env` carries supplementary env vars |
 | portal | nginx.conf | none — not key-value-driven, so `portal.existingConfigMap` is its only customization |
 
+Env precedence, lowest first: chart defaults, `global.env` (core and
+jobservice), `<component>.config` (`jobservice.env` for jobservice),
+`<component>.secret`, `<component>.extraEnv`. Build env ConfigMaps with
+`harbor.mergedEnv` so a key exists once; appending a user block after chart
+keys renders duplicate keys, which Helm resolves silently and strict YAML
+parsers reject. Chart env on the pod spec itself (explicit `env:` beats
+`envFrom`) must drop names the user claims in the passthrough, as exporter
+and trivy do. What stays pinned is per component: trivy keeps its listen
+address and Redis wiring, while the exporter lets the passthrough override
+everything, including its database and Redis credentials. The chart rejects `SCANNER_TRIVY_GITHUB_TOKEN` in `trivy.config`; set it through
+`trivy.secret` or `trivy.gitHubToken`, both stored in a Secret. Other
+`<component>.config` maps render into ConfigMaps and are not checked, so
+never put credentials there.
+
+`task helm:schema-check` fails on any `values.yaml` path missing from
+`.values-keys`. Regenerate the baseline only for chart wiring (Kubernetes
+fields, resources, chart behavior), never for a Harbor setting the
+passthrough reaches:
+`ys tools/typed-values-gate.ys values.yaml .values-keys write`.
+
 ### Three customization tiers
 
 Uniformly across components: chart defaults → inline `<component>.config`

@@ -156,6 +156,41 @@ Example output (Secret):
 {{- end }}
 {{- end }}
 
+{{/*
+Merge env blocks (each `KEY: value` YAML text) into one block with unique
+keys; a later layer wins. Appending blocks instead renders duplicate keys:
+Helm keeps the last one, strict YAML parsers reject the manifest.
+Usage: include "harbor.mergedEnv" (list $chartEnv $globalEnv $userEnv)
+*/}}
+{{- define "harbor.mergedEnv" -}}
+{{- $out := dict }}
+{{- range . }}
+{{- $layer := fromYaml . }}
+{{- if hasKey $layer "Error" }}
+{{- fail (printf "harbor.mergedEnv: cannot parse env block: %s" (get $layer "Error")) }}
+{{- end }}
+{{- $seen := dict }}
+{{- range (regexFindAll "(?m)^[ \\t]*[A-Za-z_][A-Za-z0-9_.-]*:" . -1) }}
+{{- $key := . | trim | trimSuffix ":" }}
+{{- if hasKey $seen $key }}
+{{- fail (printf "env key %s is set twice in one block; keys are uppercased, so log_level and LOG_LEVEL collide" $key) }}
+{{- end }}
+{{- $_ := set $seen $key true }}
+{{- end }}
+{{- $out = mergeOverwrite $out $layer }}
+{{- end }}
+{{- range $key, $value := $out }}
+{{ $key }}: {{ if kindIs "invalid" $value }}""{{ else if and (kindIs "float64" $value) (eq ($value | int64 | float64) $value) }}{{ $value | int64 | toString | quote }}{{ else }}{{ $value | toString | quote }}{{ end }}
+{{- end }}
+{{- end }}
+
+{{/* global.env flattened like <component>.config; shared by core and jobservice. */}}
+{{- define "harbor.globalEnv" -}}
+{{- with (.Values.global | default dict).env }}
+{{- include "harbor.toEnvVars" (dict "values" . "prefix" "" "isSecret" false) }}
+{{- end }}
+{{- end }}
+
 
 {{/*
 =============================================================================

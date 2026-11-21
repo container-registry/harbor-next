@@ -37,6 +37,7 @@ tests/
 # YAMLScript tooling (migrator, schema drift, values lint, rendered-config checks)
 tools/
 .schema-drift-allow
+.values-keys
 # CI scanner config
 .trivyignore
 # Development

@@ -1,0 +1,56 @@
+#!/usr/bin/env ys-0
+
+# typed-values-gate.ys — fail when values.yaml gains a key path that is not
+# in the .values-keys baseline.
+#
+# Usage (from the chart directory):
+#   ys tools/typed-values-gate.ys [values.yaml] [.values-keys] [write]
+#
+# The chart reaches Harbor settings through the passthrough
+# (<component>.config / .secret / .env, global.env), so a new typed value is
+# usually redundant (CONTRIBUTING.md, "Passthrough, not typed values").
+# The gate makes every new path a visible, reviewed baseline edit.
+# Passthrough maps and subcharts count as one path: their contents are
+# open by design. `write` regenerates the baseline.
+
+open-keys =:: ['config', 'secret', 'env', 'valkey', 'postgresql']
+
+defn join-path(prefix k):
+  if empty?(prefix):
+    str(k)
+    str(prefix '.' k)
+
+# walk is passed in because paths and entry-paths recurse into each other
+defn entry-paths(walk prefix entry):
+  k =: entry:first
+  path =: join-path(prefix k)
+  if k.in?(open-keys):
+    list(path)
+    cons(path walk(path entry:second))
+
+defn paths(prefix v):
+  if map?(v) && not(empty?(v)):
+    mapcat(\(entry-paths(paths prefix _)) v)
+    list()
+
+defn check(found baseline-file):
+  baseline =: set(baseline-file:read:lines.map(trim).remove(empty?))
+  new =: found.remove(\(baseline _)):V
+  when not(empty?(new)):
+    warn: "New values.yaml paths not in $baseline-file:"
+    each p new:
+      warn: "  $p"
+    warn: |-
+      Harbor settings belong in the passthrough (<component>.config,
+      .secret, jobservice.env, global.env), not in typed values. If this
+      is chart wiring rather than an app setting, regenerate the baseline:
+        ys tools/typed-values-gate.ys values.yaml .values-keys write
+    exit: 1
+  n =: found.#
+  say: "typed-values gate: $n paths, none new"
+
+defn main(values-file='values.yaml' baseline-file='.values-keys' mode=''):
+  found =: paths('' values-file:read:yaml/load):distinct:sort
+  if mode == 'write':
+    spit baseline-file: str(found.join("\n") "\n")
+    check found: baseline-file

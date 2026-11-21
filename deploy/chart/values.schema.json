@@ -166,6 +166,11 @@
         "imageRegistry": {
           "type": "string",
           "description": "Override the registry host for all component images at once (air-gap/mirror). Wins over image.source and per-component image.registry."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Env vars shared by core and jobservice, flattened like core.config. Overrides chart defaults; core.config and jobservice.env override it."
         }
       }
     },
@@ -467,7 +472,7 @@
           "type": ["string", "null"],
           "pattern": "^([a-z0-9]+(?:[._-][a-z0-9]+)*)?$",
           "maxLength": 255,
-          "description": "Project for pushes and pulls without a project in the path (DEFAULT_PROJECT_NAME). Empty disables the fallback; null leaves it to the UI."
+          "description": "DEPRECATED: use core.config.DEFAULT_PROJECT_NAME. Project for pushes and pulls without a project in the path (DEFAULT_PROJECT_NAME). Empty disables the fallback; null leaves it to the UI."
         },
         "quotaUpdateProvider": {
           "type": "string",

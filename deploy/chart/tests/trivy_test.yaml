@@ -317,6 +317,82 @@ tests:
           path: data.SCANNER_SOME_FUTURE_FLAG
           value: "enabled"
 
+  # Pins: explicit env beats envFrom, so a typed SCANNER_* entry must yield to
+  # the passthrough; Redis and API address wiring stay pinned.
+  - it: should drop chart env names claimed by trivy.config or trivy.secret
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.severity: LOW
+      trivy.config:
+        SCANNER_TRIVY_SEVERITY: CRITICAL
+        SCANNER_API_SERVER_ADDR: ":9999"
+      trivy.secret:
+        SCANNER_TRIVY_GITHUB_TOKEN: ghp_example
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCANNER_TRIVY_SEVERITY
+            value: LOW
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCANNER_TRIVY_GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-trivy
+                key: gitHubToken
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCANNER_API_SERVER_ADDR
+            value: ":8080"
+
+  # Pins the positive side: the claimed values reach the container via envFrom.
+  - it: should carry the claimed trivy.config value in the env ConfigMap
+    template: templates/trivy.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.severity: LOW
+      trivy.config.SCANNER_TRIVY_SEVERITY: CRITICAL
+    asserts:
+      - equal:
+          path: data.SCANNER_TRIVY_SEVERITY
+          value: CRITICAL
+
+  - it: should carry the claimed trivy.secret token in the env Secret
+    template: templates/trivy.secret-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.secret.SCANNER_TRIVY_GITHUB_TOKEN: ghp_example
+    asserts:
+      - equal:
+          path: data.SCANNER_TRIVY_GITHUB_TOKEN
+          value: Z2hwX2V4YW1wbGU=
+
+  # Pins: a token in trivy.config would be stored in a ConfigMap.
+  - it: should reject SCANNER_TRIVY_GITHUB_TOKEN in trivy.config
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.config.SCANNER_TRIVY_GITHUB_TOKEN: ghp_example
+    asserts:
+      - failedTemplate:
+          errorMessage: "trivy.config must not set SCANNER_TRIVY_GITHUB_TOKEN: it would land in a ConfigMap. Use trivy.secret or trivy.gitHubToken."
+
   - it: should envFrom the trivy env ConfigMap when config is set
     template: templates/trivy.statefulset.yaml
     set:
