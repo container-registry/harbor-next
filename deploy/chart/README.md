@@ -1,6 +1,6 @@
 # harbor
 
-A modern, production-ready Helm chart for [8gcr](https://github.com/container-registry/8gcr) - the cloud-native container registry for Kubernetes.
+A modern, production-ready Helm chart for [Harbor distribution 8gcr](https://github.com/container-registry/8gcr) - the cloud-native container registry for Kubernetes.
 
 ## TL;DR
 
