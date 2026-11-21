@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.2.1](https://github.com/container-registry/8gcr/compare/chart-v2.2.0...chart-v2.2.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **chart:** Default Ingress proxy-body-size To 0 (backport [#1527](https://github.com/container-registry/8gcr/issues/1527)) ([#1528](https://github.com/container-registry/8gcr/issues/1528)) ([0743f1d](https://github.com/container-registry/8gcr/commit/0743f1d4600c940245ae54e550e49de12243875d))
+* **chart:** Route /pkg/ To Core (backport [#1493](https://github.com/container-registry/8gcr/issues/1493)) ([#1496](https://github.com/container-registry/8gcr/issues/1496)) ([44f1e51](https://github.com/container-registry/8gcr/commit/44f1e51b060dbff2a3c41ff3205d3f45fd0fa146))
+* Render Deployment Strategy Explicitly So Recreate Works Under Helm 4 (backport [#834](https://github.com/container-registry/8gcr/issues/834)) ([#1526](https://github.com/container-registry/8gcr/issues/1526)) ([619dff1](https://github.com/container-registry/8gcr/commit/619dff1fd8a93820d9cf7c5931c70748985ac410))
+
+
+### Harbor Releases
+
+* **chart:** keep chart package name harbor (release-2.16) ([#1539](https://github.com/container-registry/8gcr/issues/1539)) ([9b2084e](https://github.com/container-registry/8gcr/commit/9b2084e27fbc71a8323d5ab027f07ce6e299e2e9))
+* **chart:** Name 8gcr A Harbor Distribution In Chart Description ([#1544](https://github.com/container-registry/8gcr/issues/1544)) ([155ac0f](https://github.com/container-registry/8gcr/commit/155ac0f5f3f3490288441ea9bb665f6936ff915a))
+* Rename Repository To container-registry/8gcr ([ddc9fe9](https://github.com/container-registry/8gcr/commit/ddc9fe97ffcb0e8c8b40ad85d23fa5cebfbd8b70))
+
 ## [2.2.0](https://github.com/container-registry/harbor-next/compare/chart-v2.1.2...chart-v2.2.0) (2026-11-18)
 
 
