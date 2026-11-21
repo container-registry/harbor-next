@@ -80,10 +80,11 @@ docker compose exec -T postgresql \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql &&
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
 
-# 2. Only after "dump OK": stop, switch to the new compose file, start.
+# 2. Only after "dump OK": switch to the new compose file, then restart.
 #    The upgrade runs before the database.
-grep -q -- '-- PostgreSQL database dump complete' harbor.sql && docker compose down
-docker compose up -d
+grep -q -- '-- PostgreSQL database dump complete' harbor.sql &&
+docker compose down &&
+docker compose up -d &&
 docker compose logs postgresql-upgrade
 ```
 
