@@ -922,6 +922,7 @@
         "NO_CHANGE": "Enregistrement abandonné, rien n'a changé",
         "FEATURES": "Features",
         "OPTIONAL_FEATURES": "Optional Features",
+        "COMMERCIAL_FEATURES": "Commercial",
         "FEATURE_BETA": "Beta",
         "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
         "FEATURE_LOCKED_BY": "Set by {{source}}",

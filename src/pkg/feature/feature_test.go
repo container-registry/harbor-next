@@ -287,6 +287,28 @@ func TestSectionsAreOrderedAndOnlyNonEmpty(t *testing.T) {
 	}
 }
 
+func TestCommercialSectionKeepsItsTitleAfterOptional(t *testing.T) {
+	// commercial feature files register the section without a title
+	RegisterSection(Section{ID: CommercialSection, Order: 10})
+	Register(Definition{Feature: "test_commercial", ConfigKey: "enable_test_commercial", EnvKey: "HARBOR_ENABLE_TEST_COMMERCIAL", Section: CommercialSection})
+
+	optional, commercial := -1, -1
+	for i, section := range Sections() {
+		switch section.ID {
+		case OptionalSection:
+			optional = i
+		case CommercialSection:
+			commercial = i
+			if section.Title != "CONFIG.COMMERCIAL_FEATURES" || section.Order != 10 {
+				t.Fatalf("commercial section = %+v, want the framework title", section)
+			}
+		}
+	}
+	if optional < 0 || commercial <= optional {
+		t.Fatalf("optional at %d, commercial at %d; want commercial after optional", optional, commercial)
+	}
+}
+
 func TestNotifyChangedCallsListenersForFeatureKeysOnly(t *testing.T) {
 	var changed []string
 	OnChange(func(key string) { changed = append(changed, key) })

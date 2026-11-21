@@ -922,6 +922,7 @@
         "NO_CHANGE": "保存中止，因为没有变化",
         "FEATURES": "Features",
         "OPTIONAL_FEATURES": "Optional Features",
+        "COMMERCIAL_FEATURES": "Commercial",
         "FEATURE_BETA": "Beta",
         "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
         "FEATURE_LOCKED_BY": "Set by {{source}}",
