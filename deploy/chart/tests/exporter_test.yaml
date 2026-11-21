@@ -317,10 +317,10 @@ tests:
       externalRedis.password: secret123
     asserts:
       - equal:
-          path: spec.template.spec.containers[0].env[19].name
+          path: spec.template.spec.containers[0].env[20].name
           value: REDIS_PASSWORD
       - equal:
-          path: spec.template.spec.containers[0].env[20].name
+          path: spec.template.spec.containers[0].env[21].name
           value: HARBOR_REDIS_URL
 
   # Pins: the exporter reaches core on core.servicePort.

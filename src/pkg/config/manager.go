@@ -174,6 +174,7 @@ func (c *CfgManager) GetDatabaseCfg() *models.Database {
 			HealthCheckPeriod: c.Get(ctx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
 			ConnectTimeout:    c.Get(ctx, common.PostGreSQLConnectTimeout).GetDuration(),
 			MinConns:          c.Get(ctx, common.PostGreSQLMinConns).GetOptionalInt32(),
+			StatementTimeout:  c.Get(ctx, common.PostGreSQLStatementTimeout).GetDuration(),
 			URL:               c.Get(ctx, common.PostGreSQLURL).GetString(),
 		},
 	}
