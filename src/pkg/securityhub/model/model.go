@@ -16,6 +16,17 @@ package model
 
 import "github.com/goharbor/harbor/src/pkg/scan/dao/scan"
 
+// TuneCountLimit is the largest vulnerability total reported when tune_count is set; larger totals are reported as -1.
+const TuneCountLimit = 1000
+
+// TunedTotal applies the tune_count cap to a total.
+func TunedTotal(total int64) int64 {
+	if total > TuneCountLimit {
+		return -1
+	}
+	return total
+}
+
 // Summary is the summary of scan result
 type Summary struct {
 	CriticalCnt        int64                       `json:"critical_cnt"`

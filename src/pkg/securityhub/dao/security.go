@@ -105,7 +105,7 @@ type filterMetaData struct {
 	// ColumnName is the column name in the database, if it is empty, the key will be used as the column name
 	ColumnName string
 	// FilterFunc is the function to generate the filter sql, default is exactMatchFilter
-	FilterFunc func(ctx context.Context, key string, query *q.Query) (sqlStr string, params []any)
+	FilterFunc func(ctx context.Context, key string, query *q.Query) (sqlStr string, params []any, err error)
 }
 
 // filterMap define the query condition
@@ -121,7 +121,7 @@ var filterMap = map[string]*filterMetaData{
 	"digest":          &filterMetaData{DataType: stringType, ColumnName: "a.digest"},
 }
 
-func exactMatchFilter(_ context.Context, key string, query *q.Query) (sqlStr string, params []any) {
+func exactMatchFilter(_ context.Context, key string, query *q.Query) (sqlStr string, params []any, err error) {
 	if query == nil {
 		return
 	}
@@ -137,20 +137,30 @@ func exactMatchFilter(_ context.Context, key string, query *q.Query) (sqlStr str
 	return
 }
 
-func rangeFilter(_ context.Context, key string, query *q.Query) (sqlStr string, params []any) {
+func rangeFilter(_ context.Context, key string, query *q.Query) (sqlStr string, params []any, err error) {
 	if query == nil {
 		return
 	}
 	if val, ok := query.Keywords[key]; ok {
 		if r, ok := val.(*q.Range); ok {
-			sqlStr = fmt.Sprintf(" and %v between ? and ?", key)
-			params = append(params, r.Min, r.Max)
+			// q.Build allows a range with only one bound set.
+			switch {
+			case r.Min != nil && r.Max != nil:
+				sqlStr = fmt.Sprintf(" and %v between ? and ?", key)
+				params = append(params, r.Min, r.Max)
+			case r.Min != nil:
+				sqlStr = fmt.Sprintf(" and %v >= ?", key)
+				params = append(params, r.Min)
+			case r.Max != nil:
+				sqlStr = fmt.Sprintf(" and %v <= ?", key)
+				params = append(params, r.Max)
+			}
 		}
 	}
 	return
 }
 
-func tagFilter(ctx context.Context, _ string, query *q.Query) (sqlStr string, params []any) {
+func tagFilter(ctx context.Context, _ string, query *q.Query) (sqlStr string, params []any, err error) {
 	if query == nil {
 		return
 	}
@@ -158,10 +168,9 @@ func tagFilter(ctx context.Context, _ string, query *q.Query) (sqlStr string, pa
 		inClause, err := orm.CreateInClause(ctx, `SELECT artifact_id FROM tag 
 			WHERE tag.name = ?`, val)
 		if err != nil {
-			log.Errorf("failed to create in clause: %v, skip this condition", err)
-		} else {
-			sqlStr = " and a.id " + inClause
+			return "", nil, errors.Wrap(err, "failed to resolve the tag filter")
 		}
+		sqlStr = " and a.id " + inClause
 	}
 	return
 }
@@ -280,35 +289,24 @@ func (d *dao) CountVulnerabilities(ctx context.Context, registrationUUID string,
 	if err := checkQFilter(query, filterMap); err != nil {
 		return 0, err
 	}
-	sqlStr, params = applyVulFilter(ctx, sqlStr, query, params)
+	sqlStr, params, err = applyVulFilter(ctx, sqlStr, query, params)
+	if err != nil {
+		return 0, err
+	}
 	if tuneCount {
-		exceedLimit, err := d.countExceedLimit(ctx, sqlStr, params)
-		if err != nil {
+		var capped int64
+		if err := o.Raw(fmt.Sprintf(`select count(1) cnt from (%v limit %d) as t`, sqlStr, model.TuneCountLimit+1), params).QueryRow(&capped); err != nil {
 			return 0, err
 		}
-		if exceedLimit {
-			log.Warning("the count is exceed to limit 1000 due to the tuneCount is enabled, return count with -1 instead")
-			return -1, nil
+		total := model.TunedTotal(capped)
+		if total < 0 {
+			log.Debugf("vulnerability count exceeds %d with tune_count enabled, returning -1", model.TuneCountLimit)
 		}
+		return total, nil
 	}
 	var cnt int64
 	err = o.Raw(countSQL(sqlStr), params).QueryRow(&cnt)
 	return cnt, err
-}
-
-// countExceedLimit check if the count is exceed to limit 1000, avoid count all record for large table
-func (d *dao) countExceedLimit(ctx context.Context, sqlStr string, params []any) (bool, error) {
-	o, err := orm.FromContext(ctx)
-	if err != nil {
-		return false, err
-	}
-	queryExceed := fmt.Sprintf(`SELECT EXISTS (%s LIMIT 1 OFFSET 1000)`, sqlStr)
-	var exceed bool
-	err = o.Raw(queryExceed, params).QueryRow(&exceed)
-	if err != nil {
-		return false, err
-	}
-	return exceed, nil
 }
 
 func (d *dao) ListVulnerabilities(ctx context.Context, registrationUUID string, _ int64, query *q.Query) ([]*model.VulnerabilityItem, error) {
@@ -321,31 +319,40 @@ func (d *dao) ListVulnerabilities(ctx context.Context, registrationUUID string, 
 	if err := checkQFilter(query, filterMap); err != nil {
 		return nil, err
 	}
-	sqlStr, params = applyVulFilter(ctx, sqlStr, query, params)
+	sqlStr, params, err = applyVulFilter(ctx, sqlStr, query, params)
+	if err != nil {
+		return nil, err
+	}
 	sqlStr, params = applyVulPagination(sqlStr, query, params)
 	vulnRecs := make([]*model.VulnerabilityItem, 0)
 	_, err = o.Raw(sqlStr, params).QueryRows(&vulnRecs)
 	return vulnRecs, err
 }
 
-func applyVulFilter(ctx context.Context, sqlStr string, query *q.Query, params []any) (queryStr string, newParam []any) {
+func applyVulFilter(ctx context.Context, sqlStr string, query *q.Query, params []any) (queryStr string, newParam []any, err error) {
 	if query == nil {
-		return sqlStr, params
+		return sqlStr, params, nil
 	}
 	queryStr = sqlStr
 	newParam = params
 	for k, m := range filterMap {
-		if m.FilterFunc == nil {
-			m.FilterFunc = exactMatchFilter // default filter function is exactMatchFilter
+		// filterMap is shared by concurrent requests, so the default is never written back into it.
+		filter := m.FilterFunc
+		if filter == nil {
+			filter = exactMatchFilter
 		}
-		s, p := m.FilterFunc(ctx, k, query)
+		s, p, err := filter(ctx, k, query)
+		if err != nil {
+			return "", nil, err
+		}
 		queryStr = queryStr + s
 		newParam = append(newParam, p...)
 	}
-	return queryStr, newParam
+	return queryStr, newParam, nil
 }
 
-// applyVulPagination apply pagination to the query and sort by cvss_score_v3 desc
+// applyVulPagination apply pagination to the query and sort by cvss_score_v3 desc.
+// The trailing keys make the order total, otherwise rows with equal scores can move between pages.
 func applyVulPagination(sqlStr string, query *q.Query, params []any) (string, []any) {
 	offSet := int64(0)
 	pageSize := int64(15)
@@ -356,7 +363,7 @@ func applyVulPagination(sqlStr string, query *q.Query, params []any) (string, []
 		pageSize = query.PageSize
 	}
 	params = append(params, pageSize, offSet)
-	return fmt.Sprintf("%v order by cvss_score_v3 desc nulls last limit ? offset ? ", sqlStr), params
+	return fmt.Sprintf("%v order by cvss_score_v3 desc nulls last, vr.id, a.id, s.uuid limit ? offset ? ", sqlStr), params
 }
 
 func checkQFilter(query *q.Query, filterMap map[string]*filterMetaData) error {

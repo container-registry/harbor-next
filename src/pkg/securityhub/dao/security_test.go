@@ -18,7 +18,9 @@ package dao
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -168,7 +170,8 @@ func (suite *SecurityDaoTestSuite) TestExactMatchFilter() {
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			gotSQLStr, gotParams := exactMatchFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			gotSQLStr, gotParams, err := exactMatchFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			suite.NoError(err)
 			suite.Equal(gotSQLStr, tt.wantSQLStr, "exactMatchFilter() gotSqlStr = %v, want %v", gotSQLStr, tt.wantSQLStr)
 			suite.Equal(gotParams, tt.wantParams, "exactMatchFilter() gotParams = %v, want %v", gotParams, tt.wantParams)
 		})
@@ -188,10 +191,13 @@ func (suite *SecurityDaoTestSuite) TestRangeFilter() {
 		wantParams []any
 	}{
 		{"normal", args{suite.Context(), "cvss_score_v3", q.New(q.KeyWords{"cvss_score_v3": &q.Range{1.0, 2.0}})}, " and cvss_score_v3 between ? and ?", []any{1.0, 2.0}},
+		{"min only", args{suite.Context(), "cvss_score_v3", q.New(q.KeyWords{"cvss_score_v3": &q.Range{Min: 7.0}})}, " and cvss_score_v3 >= ?", []any{7.0}},
+		{"max only", args{suite.Context(), "cvss_score_v3", q.New(q.KeyWords{"cvss_score_v3": &q.Range{Max: 7.0}})}, " and cvss_score_v3 <= ?", []any{7.0}},
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			gotSQLStr, gotParams := rangeFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			gotSQLStr, gotParams, err := rangeFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			suite.NoError(err)
 			suite.Equal(tt.wantSQLStr, gotSQLStr, "exactMatchFilter() gotSqlStr = %v, want %v", gotSQLStr, tt.wantSQLStr)
 			suite.Equal(tt.wantParams, gotParams, "exactMatchFilter() gotParams = %v, want %v", gotParams, tt.wantParams)
 		})
@@ -208,6 +214,41 @@ func (suite *SecurityDaoTestSuite) TestCountVul() {
 	count, err := suite.dao.CountVulnerabilities(suite.Context(), "ruuid", 0, true, nil)
 	suite.NoError(err)
 	suite.Equal(int64(1), count)
+}
+
+func (suite *SecurityDaoTestSuite) TestCountVulTuneCountLimit() {
+	insert := func(n int) {
+		testDao.ExecuteBatchSQL([]string{
+			fmt.Sprintf(`INSERT INTO vulnerability_record(cve_id, registration_uuid, package) SELECT 'CVE-LIMIT-' || i, 'ruuid-limit', 'pkg' FROM generate_series(1, %d) i`, n),
+			`INSERT INTO report_vulnerability_record(report_uuid, vuln_record_id) SELECT 'uuid', id FROM vulnerability_record WHERE registration_uuid = 'ruuid-limit'`,
+		})
+	}
+	cleanup := func() {
+		testDao.ExecuteBatchSQL([]string{
+			`DELETE FROM report_vulnerability_record WHERE vuln_record_id IN (SELECT id FROM vulnerability_record WHERE registration_uuid = 'ruuid-limit')`,
+			`DELETE FROM vulnerability_record WHERE registration_uuid = 'ruuid-limit'`,
+		})
+	}
+	testDao.ExecuteBatchSQL([]string{`INSERT INTO scanner_registration (name, url, uuid, auth) VALUES ('trivy-limit', 'https://limit.example.com', 'ruuid-limit', 'empty')`})
+	defer func() {
+		cleanup()
+		testDao.ExecuteBatchSQL([]string{`DELETE FROM scanner_registration WHERE uuid = 'ruuid-limit'`})
+	}()
+
+	insert(1000)
+	count, err := suite.dao.CountVulnerabilities(suite.Context(), "ruuid-limit", 0, true, nil)
+	suite.NoError(err)
+	suite.Equal(int64(1000), count, "a total at the limit is reported exactly")
+
+	cleanup()
+	insert(1001)
+	count, err = suite.dao.CountVulnerabilities(suite.Context(), "ruuid-limit", 0, true, nil)
+	suite.NoError(err)
+	suite.Equal(int64(-1), count, "a total above the limit is reported as -1")
+
+	count, err = suite.dao.CountVulnerabilities(suite.Context(), "ruuid-limit", 0, false, nil)
+	suite.NoError(err)
+	suite.Equal(int64(1001), count, "without tune_count the exact total is reported")
 }
 
 func (suite *SecurityDaoTestSuite) TestListVul() {
@@ -232,7 +273,8 @@ func (suite *SecurityDaoTestSuite) TestTagFilter() {
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			gotSqlStr, gotParams := tagFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			gotSqlStr, gotParams, err := tagFilter(tt.args.ctx, tt.args.key, tt.args.query)
+			suite.NoError(err)
 			suite.True(strings.Contains(gotSqlStr, tt.wantSqlStr), "tagFilter() gotSqlStr = %v, want %v", gotSqlStr, tt.wantSqlStr)
 			suite.Equal(gotParams, tt.wantParams, "tagFilter() gotParams = %v, want %v", gotParams, tt.wantParams)
 		})
@@ -256,9 +298,67 @@ func (suite *SecurityDaoTestSuite) TestApplyVulFilter() {
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			gotSqlStr, gotParams := applyVulFilter(tt.args.ctx, tt.args.sqlStr, tt.args.query, tt.args.params)
+			gotSqlStr, gotParams, err := applyVulFilter(tt.args.ctx, tt.args.sqlStr, tt.args.query, tt.args.params)
+			suite.NoError(err)
 			suite.True(strings.Contains(gotSqlStr, tt.wantSqlStr), "applyVulFilter() gotSqlStr = %v, want %v", gotSqlStr, tt.wantSqlStr)
 			suite.Equal(gotParams, tt.wantParams, "applyVulFilter() gotParams = %v, want %v", gotParams, tt.wantParams)
 		})
 	}
+}
+
+func (suite *SecurityDaoTestSuite) TestTagFilterError() {
+	query := q.New(q.KeyWords{"tag": "tag_test"})
+	_, _, err := tagFilter(context.Background(), "tag", query)
+	suite.Error(err, "a failed tag lookup must fail the request instead of dropping the filter")
+
+	_, err = suite.dao.ListVulnerabilities(context.Background(), "ruuid", 0, query)
+	suite.Error(err)
+	_, err = suite.dao.CountVulnerabilities(context.Background(), "ruuid", 0, true, query)
+	suite.Error(err)
+}
+
+func (suite *SecurityDaoTestSuite) TestApplyVulFilterConcurrent() {
+	query := q.New(q.KeyWords{"cve_id": "CVE-2023-2345", "severity": "High"})
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := applyVulFilter(suite.Context(), vulnerabilitySQL, query, nil)
+			suite.NoError(err)
+		}()
+	}
+	wg.Wait()
+	for k, m := range filterMap {
+		if k != "cvss_score_v3" && k != "tag" {
+			suite.Nil(m.FilterFunc, "applyVulFilter must not write into the shared filterMap (%s)", k)
+		}
+	}
+}
+
+func (suite *SecurityDaoTestSuite) TestListVulStablePaging() {
+	testDao.ExecuteBatchSQL([]string{
+		`INSERT INTO scanner_registration (name, url, uuid, auth) VALUES ('trivy-page', 'https://page.example.com', 'ruuid-page', 'empty')`,
+		`INSERT INTO vulnerability_record(cve_id, registration_uuid, package, cvss_score_v3) SELECT 'CVE-PAGE-' || i, 'ruuid-page', 'pkg', 7.5 FROM generate_series(1, 50) i`,
+		`INSERT INTO report_vulnerability_record(report_uuid, vuln_record_id) SELECT 'uuid', id FROM vulnerability_record WHERE registration_uuid = 'ruuid-page'`,
+	})
+	defer testDao.ExecuteBatchSQL([]string{
+		`DELETE FROM report_vulnerability_record WHERE vuln_record_id IN (SELECT id FROM vulnerability_record WHERE registration_uuid = 'ruuid-page')`,
+		`DELETE FROM vulnerability_record WHERE registration_uuid = 'ruuid-page'`,
+		`DELETE FROM scanner_registration WHERE uuid = 'ruuid-page'`,
+	})
+
+	all, err := suite.dao.CountVulnerabilities(suite.Context(), "ruuid-page", 0, false, nil)
+	suite.NoError(err)
+	seen := map[string]bool{}
+	for page := int64(1); (page-1)*7 < all; page++ {
+		vuls, err := suite.dao.ListVulnerabilities(suite.Context(), "ruuid-page", 0, &q.Query{PageNumber: page, PageSize: 7})
+		suite.NoError(err)
+		for _, v := range vuls {
+			key := fmt.Sprintf("%s/%d", v.CVEID, v.ArtifactID)
+			suite.False(seen[key], "row %s returned on more than one page", key)
+			seen[key] = true
+		}
+	}
+	suite.Len(seen, int(all), "tied scores must still page through every row exactly once")
 }

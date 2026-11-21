@@ -111,16 +111,51 @@ func (s *securityAPI) ListVulnerabilities(ctx context.Context, params securityMo
 	if err != nil || len(scannerUUID) == 0 {
 		return securityModel.NewListVulnerabilitiesOK().WithPayload([]*models.VulnerabilityItem{}).WithXTotalCount(0)
 	}
-	cnt, err := s.controller.CountVuls(ctx, scannerUUID, 0, *params.TuneCount, query)
-	if err != nil {
-		return s.SendError(ctx, err)
-	}
 	vuls, err := s.controller.ListVuls(ctx, scannerUUID, 0, *params.WithTag, query)
 	if err != nil {
 		return s.SendError(ctx, err)
 	}
-	link := s.Links(ctx, params.HTTPRequest.URL, cnt, query.PageNumber, query.PageSize).String()
+	cnt, known := totalFromPage(query.PageNumber, query.PageSize, len(vuls), *params.TuneCount)
+	if !known {
+		cnt, err = s.controller.CountVuls(ctx, scannerUUID, 0, *params.TuneCount, query)
+		if err != nil {
+			return s.SendError(ctx, err)
+		}
+	}
+	link := s.Links(ctx, params.HTTPRequest.URL, linkTotal(cnt, query.PageNumber, query.PageSize, len(vuls)), query.PageNumber, query.PageSize).String()
 	return securityModel.NewListVulnerabilitiesOK().WithPayload(toVulnerabilities(vuls)).WithLink(link).WithXTotalCount(cnt)
+}
+
+// totalFromPage derives the total from a page that is not full, so the count query, which joins the same
+// tables as the list query, only runs when the total cannot be known from the page itself.
+func totalFromPage(pageNumber, pageSize int64, rows int, tuneCount bool) (int64, bool) {
+	if pageSize <= 0 || int64(rows) >= pageSize || (rows == 0 && pageNumber > 1) {
+		return 0, false
+	}
+	total := int64(rows)
+	if pageNumber > 1 {
+		total += (pageNumber - 1) * pageSize
+	}
+	if tuneCount {
+		return secHubModel.TunedTotal(total), true
+	}
+	return total, true
+}
+
+// linkTotal returns the total that Links needs to emit prev and next. When tune_count hides the total (-1),
+// a full page implies a next page and any page after the first implies a previous one.
+func linkTotal(total, pageNumber, pageSize int64, rows int) int64 {
+	if total >= 0 {
+		return total
+	}
+	if pageNumber < 1 {
+		pageNumber = 1
+	}
+	known := (pageNumber-1)*pageSize + int64(rows)
+	if int64(rows) >= pageSize {
+		known++
+	}
+	return known
 }
 
 func toVulnerabilities(vuls []*secHubModel.VulnerabilityItem) []*models.VulnerabilityItem {
