@@ -60,12 +60,13 @@ kubectl -n harbor wait --for=delete pod --timeout=5m \
   -l 'app.kubernetes.io/instance=harbor,app.kubernetes.io/component in (core,jobservice)'
 kubectl -n harbor exec postgresql-0 -c postgresql -- \
   sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d "$POSTGRES_DB"' > harbor.sql
-grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
-helm upgrade harbor <chart> -n harbor -f values.yaml
-kubectl -n harbor logs postgresql-0 -c pgdata-upgrade
+grep -q -- '-- PostgreSQL database dump complete' harbor.sql &&
+  helm upgrade harbor <chart> -n harbor -f values.yaml
 ```
 
-The last log line starts with `upgraded 18/docker to 19/docker`. When Harbor works, remove
+Run the upgrade only after a complete dump, as above. Then check
+`kubectl -n harbor logs postgresql-0 -c pgdata-upgrade`: the last line starts
+with `upgraded 18/docker to 19/docker`. When Harbor works, remove
 the old directory, which still holds the PostgreSQL 18 catalog:
 
 ```sh

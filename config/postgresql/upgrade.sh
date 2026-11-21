@@ -31,8 +31,8 @@ single() {
   "$1/postgres" --single -D "$2" -j template1 2>/dev/null | sed -n 's/^[[:space:]]*1: r = "\(.*\)"[[:space:]].*/\1/p'
 }
 r=$(single "$PGBINOLD" 18/docker <<'SQL'
-select concat_ws('|', a.rolname, pg_encoding_to_char(d.encoding), d.datlocprovider::text,
-  d.datcollate, d.datctype, coalesce(d.datlocale, ''), current_setting('data_checksums')) as r
+select concat_ws('|', pg_encoding_to_char(d.encoding), d.datlocprovider::text, d.datcollate,
+  d.datctype, coalesce(d.datlocale, ''), current_setting('data_checksums'), a.rolname) as r
   from pg_authid a, pg_database d where a.oid = 10 and d.datname = 'template0'
 SQL
 )
@@ -45,7 +45,8 @@ select 'update pg_database d set datcollversion = v.c from (values ' ||
 SQL
 )
 [ -n "$r" ] && [ -n "$collv" ] || { echo "cannot read the PostgreSQL 18 cluster in 18/docker" >&2; exit 1; }
-IFS='|' read -r user enc prov coll ctype loc sums <<EOF
+# The role name goes last: read leaves any '|' in it to the last variable.
+IFS='|' read -r enc prov coll ctype loc sums user <<EOF
 $r
 EOF
 
