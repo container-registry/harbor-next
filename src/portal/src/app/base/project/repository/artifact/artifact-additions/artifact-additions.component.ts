@@ -98,6 +98,12 @@ export class ArtifactAdditionsComponent implements AfterViewChecked, OnInit {
         }
         return null;
     }
+    getDockerfile(): AdditionLink {
+        if (this.additionLinks && this.additionLinks[ADDITIONS.DOCKERFILE]) {
+            return this.additionLinks[ADDITIONS.DOCKERFILE];
+        }
+        return null;
+    }
     getSummary(): AdditionLink {
         if (this.additionLinks && this.additionLinks[ADDITIONS.SUMMARY]) {
             return this.additionLinks[ADDITIONS.SUMMARY];
@@ -133,6 +139,10 @@ export class ArtifactAdditionsComponent implements AfterViewChecked, OnInit {
 
     actionTab(tab: string): void {
         this.currentTabLinkId = tab;
+    }
+
+    onDockerfileSwitchTab(tab: string): void {
+        this.actionTab(tab);
     }
 
     getScanBtnState(): ClrLoadingState {
