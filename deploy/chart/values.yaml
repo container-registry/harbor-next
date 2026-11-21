@@ -1588,23 +1588,64 @@ postgresql:
   image:
     # -- PostgreSQL image tag. The data lives in `<major>/docker` on the volume.
     tag: "19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60"
-  # -- Refuses to start when the volume holds data of an older major, which
-  # PostgreSQL 19 would otherwise skip and start empty. pgautoupgrade has no
-  # 19 image yet, so the upgrade is manual. See docs/postgresql.md.
-  # @default -- data guard, see values.yaml
+  # -- Upgrades PostgreSQL 18 data in `18/docker` to 19 with pg_upgrade in link mode
+  # before PostgreSQL starts, and refuses older majors and layouts, which
+  # PostgreSQL 19 would otherwise skip and start empty. See docs/postgresql.md.
+  # @default -- pg_upgrade from 18, see values.yaml
   initContainers:
-    - name: pgdata-guard
-      image: docker.io/library/postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
+    - name: pgdata-upgrade
+      image: docker.io/tianon/postgres-upgrade:18-to-19@sha256:8cadd7229702c1b636775b575f733740a09ffae6ebbf6f16944c0844ffc1de6f
       workingDir: /var/lib/postgresql
       command: ["sh", "-c"]
       args:
         - |
+          set -eu
           [ -s 19/docker/PG_VERSION ] && exit 0
-          for d in [0-9]*/docker pgdata pgdata/pg[0-9]*; do
-            [ -s "$d/PG_VERSION" ] || continue
-            echo "found PostgreSQL $(cat "$d/PG_VERSION") data in $d; upgrade it to 19 first, see the chart's docs/postgresql.md" >&2
-            exit 1
-          done
+          if [ ! -s 18/docker/PG_VERSION ]; then
+            for d in . data [0-9]*/docker pgdata pgdata/pg[0-9]*; do
+              [ -s "$d/PG_VERSION" ] || continue
+              echo "found PostgreSQL $(cat "$d/PG_VERSION") data in $d; only 18/docker is upgraded automatically, see the chart's docs/postgresql.md" >&2
+              exit 1
+            done
+            exit 0
+          fi
+          rm -rf 19/upgrade
+          if [ -f 18/docker/global/pg_control.old ] && [ ! -f 18/docker/global/pg_control ]; then
+            mv 18/docker/global/pg_control.old 18/docker/global/pg_control
+          fi
+          single() {
+            "$1/postgres" --single -D "$2" -j template1 2>/dev/null | sed -n 's/^[[:space:]]*1: r = "\(.*\)"[[:space:]].*/\1/p'
+          }
+          r=$(single "$PGBINOLD" 18/docker <<'SQL'
+          select concat_ws('|', pg_encoding_to_char(d.encoding), d.datlocprovider::text, d.datcollate,
+            d.datctype, coalesce(d.datlocale, ''), current_setting('data_checksums'), a.rolname) as r
+            from pg_authid a, pg_database d where a.oid = 10 and d.datname = 'template0'
+          SQL
+          )
+          collv=$(single "$PGBINOLD" 18/docker <<'SQL'
+          select 'update pg_database d set datcollversion = v.c from (values ' ||
+            string_agg(format('(%L, %L::text)', datname, datcollversion), ', ') ||
+            ') v(n, c) where d.datname = v.n' as r from pg_database
+          SQL
+          )
+          [ -n "$r" ] && [ -n "$collv" ] || { echo "cannot read the PostgreSQL 18 cluster in 18/docker" >&2; exit 1; }
+          IFS='|' read -r enc prov coll ctype loc sums user <<EOF
+          $r
+          EOF
+          set -- --username="$user" --encoding="$enc" --lc-collate="$coll" --lc-ctype="$ctype"
+          case $prov in
+            i) set -- "$@" --locale-provider=icu --icu-locale="$loc" ;;
+            b) set -- "$@" --locale-provider=builtin --builtin-locale="$loc" ;;
+          esac
+          [ "$sums" = on ] || set -- "$@" --no-data-checksums
+          mkdir -p 19
+          "$PGBINNEW/initdb" -D 19/upgrade "$@"
+          "$PGBINNEW/pg_upgrade" --link -U "$user" -b "$PGBINOLD" -B "$PGBINNEW" -d 18/docker -D 19/upgrade
+          echo "$collv" | "$PGBINNEW/postgres" --single -D 19/upgrade -j template1 >/dev/null
+          cp 18/docker/pg_hba.conf 18/docker/pg_ident.conf 18/docker/postgresql.auto.conf 19/upgrade/
+          mv -T 19/upgrade 19/docker
+          rm -f delete_old_cluster.sh
+          echo "upgraded 18/docker to 19/docker; remove 18 once PostgreSQL 19 runs"
       securityContext:
         allowPrivilegeEscalation: false
         runAsNonRoot: true

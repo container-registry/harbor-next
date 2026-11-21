@@ -58,45 +58,47 @@ the layout the PostgreSQL 19 image expects. The version is fixed in the
 compose file and `POSTGRES_VERSION` is not read, because an older image on
 this mount would ignore the existing data and start an empty database.
 
-Swapping the image does not upgrade a data directory. On a volume created by an
-earlier compose file (PostgreSQL 18, 16, or 15 if you pinned it), the
-PostgreSQL 19 container refuses to start and logs that it found data from an
-older version. Move the data over with a dump and restore before you update
-the compose file:
+Before the database starts, the one-shot `postgresql-upgrade` service checks
+the volume with `config/postgresql/upgrade.sh`. A volume from the previous
+compose file, with PostgreSQL 18 data in `18/docker`, is upgraded in place
+with `pg_upgrade --link` from the `tianon/postgres-upgrade:18-to-19` image.
+The new cluster keeps the old superuser, encoding, locale and data checksum
+setting. An empty volume or one already on 19 is left alone. Older data (a
+volume from PostgreSQL 16 or 15 at `/var/lib/postgresql/data`) makes the
+service fail with the directory it found; move it with a `pg_dump` from the
+old container and a `psql` restore into a fresh volume.
+
+Dump the database before you update the compose file. After PostgreSQL 19
+starts on the linked files, the PostgreSQL 18 copy can no longer be started:
 
 ```bash
 cd deploy/compose
 
-# 1. With the OLD compose file: stop Harbor, keep only the database running
-docker compose down
-docker compose up -d --wait postgresql
-
-# 2. Dump the Harbor database as the configured user (DB_USER, DB_NAME)
+# 1. With the OLD compose file: stop Harbor's writers, dump the database
+docker compose stop core jobservice &&
 docker compose exec -T postgresql \
-  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql &&
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
 
-# 3. Remove the old volume, guarded so it only happens after a complete dump
-project=$(docker compose config | sed -n 's/^name: //p')
-docker compose down
-grep -q -- '-- PostgreSQL database dump complete' harbor.sql \
-  && docker volume rm "${project}_postgres-data"
-
-# 4. Update to the new compose file, then restore into the fresh PostgreSQL 19
-docker compose up -d --wait postgresql
-docker compose exec -T postgresql \
-  sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < harbor.sql > /dev/null \
-  && echo "restore OK"
-
-# 5. Start Harbor
-docker compose up -d
+# 2. Only after "dump OK": switch to the new compose file, then restart.
+#    The upgrade runs before the database.
+grep -q -- '-- PostgreSQL database dump complete' harbor.sql &&
+docker compose down &&
+docker compose up -d &&
+docker compose logs postgresql-upgrade
 ```
 
-Remove the old volume only after step 2 printed `dump OK`. Without it, keep
-the old volume and the old compose file and look into the error first. If step
-4 does not print `restore OK`, run `docker compose down`, remove the new volume
-the same way as in step 3 and repeat step 4. Keep `harbor.sql` and
-`config/secret_key` together until the upgraded Harbor works.
+The last log line starts with `upgraded 18/docker to 19/docker`. When Harbor
+works, the
+old `18` directory on the volume can go:
+
+```bash
+docker compose exec postgresql rm -rf /var/lib/postgresql/18
+```
+
+Keep `harbor.sql` and `config/secret_key` together until the upgraded Harbor
+works. If the upgrade fails, `docker compose up -d` retries it from the
+start.
 
 ## TLS Certificates
 
