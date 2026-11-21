@@ -14,6 +14,7 @@
 import { Component, OnInit } from '@angular/core';
 import { concat } from 'rxjs';
 import { finalize, toArray } from 'rxjs/operators';
+import { TranslateService } from '@ngx-translate/core';
 import { ConfigureService } from 'ng-swagger-gen/services/configure.service';
 import { Feature } from 'ng-swagger-gen/models/feature';
 import { FeatureSection } from 'ng-swagger-gen/models/feature-section';
@@ -39,7 +40,8 @@ export class FeaturesComponent implements OnInit {
     constructor(
         private configureService: ConfigureService,
         private appConfigService: AppConfigService,
-        private messageHandler: MessageHandlerService
+        private messageHandler: MessageHandlerService,
+        private translate: TranslateService
     ) {}
 
     // Covers the reload after a save too, so nothing can be edited or
@@ -71,8 +73,17 @@ export class FeaturesComponent implements OnInit {
             });
     }
 
+    // Sorted by the label users read, in their language, since a name may be an i18n key.
     featuresOf(section: FeatureSection): Feature[] {
-        return this.features.filter(feature => feature.section === section.id);
+        const label = (feature: Feature) =>
+            this.translate.instant(feature.name || feature.key);
+        return this.features
+            .filter(feature => feature.section === section.id)
+            .sort((a, b) =>
+                label(a).localeCompare(label(b), this.translate.currentLang, {
+                    sensitivity: 'base',
+                })
+            );
     }
 
     value(feature: Feature): boolean {

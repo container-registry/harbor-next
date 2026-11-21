@@ -920,6 +920,7 @@
         "NO_CHANGE": "변경된 사항이 없으므로 저장을 중단합니다.",
         "FEATURES": "Features",
         "OPTIONAL_FEATURES": "Optional Features",
+        "COMMERCIAL_FEATURES": "Commercial",
         "FEATURE_BETA": "Beta",
         "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
         "FEATURE_LOCKED_BY": "Set by {{source}}",

@@ -42,6 +42,9 @@ type Feature string
 // OptionalSection is the section a feature lands in when Definition.Section is empty.
 const OptionalSection = "optional"
 
+// CommercialSection lists the commercial features at the bottom of the page.
+const CommercialSection = "commercial"
+
 // Definition describes a feature. ConfigKey is the stored configuration key
 // and the flag key; EnvKey is the environment variable that overrides it.
 // Name and Description go through the portal's translate pipe, so they may
@@ -109,6 +112,7 @@ var (
 func init() {
 	// optional features lead the page and need no heading of their own
 	RegisterSection(Section{ID: OptionalSection, Order: -1})
+	RegisterSection(Section{ID: CommercialSection, Title: "CONFIG.COMMERCIAL_FEATURES", Order: 10})
 }
 
 // Register adds feature definitions and their boolean configuration items.
@@ -154,14 +158,36 @@ func registerConfigItem(def Definition) {
 	}
 }
 
-// RegisterSection adds or replaces a section of the Features page.
+// RegisterSection adds a section of the Features page. Registering an ID
+// again overrides only the fields set, so a feature file can name its
+// section without repeating the framework's title.
 func RegisterSection(section Section) {
 	if section.ID == "" {
 		panic("feature section needs an ID")
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	sections[section.ID] = section
+	existing, ok := sections[section.ID]
+	if !ok {
+		sections[section.ID] = section
+		return
+	}
+	if section.Title != "" {
+		existing.Title = section.Title
+	}
+	if section.Description != "" {
+		existing.Description = section.Description
+	}
+	if section.LinkText != "" {
+		existing.LinkText = section.LinkText
+	}
+	if section.Link != nil {
+		existing.Link = section.Link
+	}
+	if section.Order != 0 {
+		existing.Order = section.Order
+	}
+	sections[section.ID] = existing
 }
 
 // Definitions returns all registered feature definitions.

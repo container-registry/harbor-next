@@ -19,6 +19,7 @@ import { SharedTestingModule } from '../../../../shared/shared.module';
 import { AppConfigService } from '../../../../services/app-config.service';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { FeaturesComponent } from './features.component';
+import { TranslateService } from '@ngx-translate/core';
 
 function featureList(): FeatureList {
     return {
@@ -145,6 +146,65 @@ describe('FeaturesComponent', () => {
             'Licensed Features'
         );
         expect(sections[1].querySelector('h3')).toBeNull();
+    });
+
+    it('lists the features of a section by their translated label', async () => {
+        const list = featureList();
+        list.features.push({
+            key: 'enable_keyed_feature',
+            section: 'optional',
+            name: 'CONFIG.KEYED_FEATURE',
+            enabled: false,
+            editable: true,
+        });
+        setup(of(list));
+        const translate = TestBed.inject(TranslateService);
+        translate.setTranslation('en-us', {
+            CONFIG: { KEYED_FEATURE: 'Alpha Feature' },
+        });
+        translate.use('en-us');
+        await render();
+        const keys = Array.from(
+            fixture.nativeElement.querySelectorAll(
+                '#feature-section-optional input'
+            )
+        ).map((input: HTMLInputElement) => input.id);
+        expect(keys).toEqual([
+            'enable_keyed_feature',
+            'enable_locked_feature',
+            'enable_test_feature',
+        ]);
+    });
+
+    it('sorts the labels with the collation of the portal language', async () => {
+        const list = featureList();
+        list.features = [
+            {
+                key: 'enable_dotted',
+                section: 'optional',
+                name: 'İade',
+                enabled: false,
+                editable: true,
+            },
+            {
+                key: 'enable_dotless',
+                section: 'optional',
+                name: 'Irmak',
+                enabled: false,
+                editable: true,
+            },
+        ];
+        setup(of(list));
+        const translate = TestBed.inject(TranslateService);
+        translate.setTranslation('tr-tr', {});
+        translate.use('tr-tr');
+        await render();
+        const keys = Array.from(
+            fixture.nativeElement.querySelectorAll(
+                '#feature-section-optional input'
+            )
+        ).map((input: HTMLInputElement) => input.id);
+        expect(keys).toEqual(['enable_dotless', 'enable_dotted']);
     });
 
     it('locks a feature the backend reports as not editable', async () => {
