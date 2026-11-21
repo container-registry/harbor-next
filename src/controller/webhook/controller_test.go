@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/notification/policy/model"
 	task_model "github.com/goharbor/harbor/src/pkg/task"
@@ -99,11 +100,22 @@ func (c *controllerTestSuite) TestDeletePolicy() {
 	err = c.ctl.DeletePolicy(context.TODO(), 1)
 	c.ErrorIs(err, delExecErr)
 
+	// failed to delete policy due to telegram executions deletion error
+	c.execMgr.On("DeleteByVendor", mock.Anything, "WEBHOOK", mock.Anything).Return(nil).Once()
+	c.execMgr.On("DeleteByVendor", mock.Anything, "SLACK", mock.Anything).Return(nil).Once()
+	c.execMgr.On("DeleteByVendor", mock.Anything, "TELEGRAM", mock.Anything).Return(delExecErr).Once()
+	err = c.ctl.DeletePolicy(context.TODO(), 1)
+	c.ErrorIs(err, delExecErr)
+
 	// successfully deletion for all
 	c.execMgr.On("DeleteByVendor", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.policyMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
 	err = c.ctl.DeletePolicy(context.TODO(), 1)
 	c.NoError(err)
+
+	// every registered vendor type must be swept on delete, otherwise
+	// executions for a removed vendor are orphaned.
+	c.execMgr.AssertCalled(c.T(), "DeleteByVendor", mock.Anything, job.TelegramJobVendorType, mock.Anything)
 }
 
 func (c *controllerTestSuite) TestGetRelatedPolices() {
