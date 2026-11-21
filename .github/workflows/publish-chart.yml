@@ -157,34 +157,34 @@ jobs:
       - name: Package chart
         # VERSION comes from the validated release tag. appVersion is not
         # overridden: it stays as committed in Chart.yaml so default image
-        # tags resolve to an already-published Harbor app version. Packages
-        # both 8gcr and the legacy harbor name, see chart-package.sh. Tags
-        # cut before the rename still name the chart harbor and have no such
-        # script; any other checkout must have it, so a missing one fails.
+        # tags resolve to an already-published Harbor app version.
         run: |
-          if grep -qx 'name: harbor' deploy/chart/Chart.yaml; then
-            helm package deploy/chart --version "${VERSION}" --destination dist
-          else
-            .github/scripts/chart-package.sh deploy/chart "${VERSION}" dist
-          fi
+          helm package deploy/chart \
+            --version "${VERSION}" \
+            --destination dist
 
-      - name: Push and sign charts
+      - name: Push chart
         id: push
         # pipefail: GitHub's default shell is `bash -e` without it, so a
         # failing helm push would be masked by tee — and its error message
         # contains a sha256 digest the capture below would happily match.
         run: |
           set -euo pipefail
-          charts=""
-          for tgz in dist/*-"${VERSION}".tgz; do
-            chart="$(basename "${tgz}" "-${VERSION}.tgz")"
-            helm push "${tgz}" "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts" 2>&1 | tee "push-${chart}.log"
-            digest=$(grep -o 'sha256:[a-f0-9]\{64\}' "push-${chart}.log" | head -1 || true)
-            [ -n "$digest" ] || { echo "Failed to capture the ${chart} chart digest from helm push output" >&2; exit 1; }
-            cosign sign --yes "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/${chart}@${digest}"
-            charts="${charts} ${chart}"
-          done
-          echo "charts=${charts}" >> "$GITHUB_OUTPUT"
+          helm push "dist/harbor-${VERSION}.tgz" \
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
+          digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1 || true)
+          if [ -z "$digest" ]; then
+            echo "Failed to capture chart digest from helm push output" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart
+        env:
+          CHART_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor@${CHART_DIGEST}"
 
       - name: Install oras
         # Direct download: setup-oras rejects versions its list lags behind.
@@ -209,13 +209,13 @@ jobs:
       - name: Push Artifact Hub repository metadata
         # artifacthub-repo.yml rides next to the chart as an OCI artifact
         # (artifacthub.io tag) — Artifact Hub reads it for ownership /
-        # verified publisher. See deploy/chart/artifacthub-repo.yml.
-        working-directory: deploy/chart
-        env:
-          CHARTS: ${{ steps.push.outputs.charts }}
+        # verified publisher. See deploy/chart/artifacthub-repo-harbor.yml.
+        # The layer title must stay artifacthub-repo.yml, hence the copy.
         run: |
-          for chart in ${CHARTS}; do
-            oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/${chart}:artifacthub.io" \
-              --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
-              artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
-          done
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/artifacthub-harbor"
+          mkdir -p "${dir}"
+          cp deploy/chart/artifacthub-repo-harbor.yml "${dir}/artifacthub-repo.yml"
+          (cd "${dir}" && oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor:artifacthub.io" \
+            --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+            artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml)
